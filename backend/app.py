@@ -51,7 +51,7 @@ except ImportError:
 from ocr.ocr_engine import extract_text
 
 app = Flask(__name__)
-app.secret_key = "super_secret_key_for_prescription_ocr"
+app.secret_key = os.environ.get("SECRET_KEY", "super_secret_key_for_prescription_ocr")
 app.config["JSON_AS_ASCII"] = False
 
 
