@@ -29,11 +29,18 @@ if tesseract_path:
 def _resize_for_ocr(gray):
     h, w = gray.shape[:2]
     max_side = max(h, w)
-    if max_side < 2200:
-        scale = 2200 / max_side
+    # Cap tối đa 1600px để giảm thời gian Tesseract trên server yếu
+    target = 1600
+    if max_side < target:
+        scale = target / max_side
         new_w = int(w * scale)
         new_h = int(h * scale)
         return cv2.resize(gray, (new_w, new_h), interpolation=cv2.INTER_CUBIC)
+    elif max_side > 2400:
+        scale = 2400 / max_side
+        new_w = int(w * scale)
+        new_h = int(h * scale)
+        return cv2.resize(gray, (new_w, new_h), interpolation=cv2.INTER_AREA)
     return gray
 
 
@@ -212,13 +219,13 @@ def _post_process_text(text):
 
 
 def _extract_with_confidence(image, lang, config):
-    raw_text = pytesseract.image_to_string(image, lang=lang, config=config, timeout=25)
+    raw_text = pytesseract.image_to_string(image, lang=lang, config=config, timeout=8)
     data = pytesseract.image_to_data(
         image,
         lang=lang,
         config=config,
         output_type=pytesseract.Output.DICT,
-        timeout=25,
+        timeout=8,
     )
 
     confidences = []
@@ -297,17 +304,16 @@ def extract_text(image_path):
             source_images.append(cropped_img)
 
         languages = _build_language_list()
+        # Giảm xuống 2 config tốt nhất để chạy nhanh trên free tier
         configs = [
             r"--oem 1 --psm 6 -c preserve_interword_spaces=1 -c user_defined_dpi=300",
             r"--oem 1 --psm 4 -c preserve_interword_spaces=1 -c user_defined_dpi=300",
-            r"--oem 1 --psm 11 -c preserve_interword_spaces=1 -c user_defined_dpi=300",
-            r"--oem 1 --psm 12 -c preserve_interword_spaces=1 -c user_defined_dpi=300",
         ]
 
         best_text = ""
         best_score = -1.0
         attempts = 0
-        max_attempts = 80
+        max_attempts = 12
 
         for source in source_images:
             variants = preprocess_variants(source)
