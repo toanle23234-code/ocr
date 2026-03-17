@@ -2218,7 +2218,7 @@ submitBtn.addEventListener('click', async () => {
     try {
         const controller = new AbortController();
         // Timeout 25s phù hợp với Render free tier (limit 30s)
-        const timeoutId = setTimeout(() => controller.abort(), 25000);
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
         const response = await fetch(isBatch ? '/upload-batch' : '/upload', { method: 'POST', body: formData, signal: controller.signal });
         clearTimeout(timeoutId);
         const data = await response.json();

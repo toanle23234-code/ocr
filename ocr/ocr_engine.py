@@ -219,27 +219,9 @@ def _post_process_text(text):
 
 
 def _extract_with_confidence(image, lang, config):
-    raw_text = pytesseract.image_to_string(image, lang=lang, config=config, timeout=8)
-    data = pytesseract.image_to_data(
-        image,
-        lang=lang,
-        config=config,
-        output_type=pytesseract.Output.DICT,
-        timeout=8,
-    )
-
-    confidences = []
-    for conf in data.get("conf", []):
-        try:
-            value = float(conf)
-            if value >= 0:
-                confidences.append(value)
-        except (TypeError, ValueError):
-            continue
-
+    raw_text = pytesseract.image_to_string(image, lang=lang, config=config, timeout=5)
     text = _post_process_text(raw_text)
-    avg_conf = float(np.mean(confidences)) if confidences else 0.0
-    score = _score_ocr_text(text, avg_conf)
+    score = _score_ocr_text(text, 0.0)
     return text, score
 
 
@@ -313,7 +295,7 @@ def extract_text(image_path):
         best_text = ""
         best_score = -1.0
         attempts = 0
-        max_attempts = 12
+        max_attempts = 4
 
         for source in source_images:
             variants = preprocess_variants(source)
@@ -333,7 +315,7 @@ def extract_text(image_path):
                             best_score = score
                             best_text = text
                             # Fast early-stop when text quality is already good.
-                            if best_score >= 82:
+                            if best_score >= 70:
                                 return best_text
                     if attempts > max_attempts:
                         break
