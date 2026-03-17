@@ -1,0 +1,37 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Git
+.git/
+.gitignore
+
+# Environment secrets
+.env
+
+# Uploaded files và database (ephemeral trên Render)
+uploads/
+database/app.db
+
+# Logs và temp files
+*.log
+tail.txt
+script_dump.txt
+
+# Debug/utility scripts (không cần trong container)
+debug_*.py
+fix_*.py
+force_logout.py
+reset_password.py
+
+# Development files
+*.bak
+test_*.txt
