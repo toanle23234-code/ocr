@@ -298,6 +298,70 @@ def _post_process_text(text):
     return text.strip()
 
 
+def _organize_prescription_sections(text):
+    """Organize prescription text into proper sections with clear separation"""
+    if not text:
+        return text
+    
+    # Define section headers and their priorities
+    sections_patterns = [
+        (r"(?i)(đơn\s+thuốc|don\s+thuoc|toa\s+thuoc|prescription)", "ĐƠNTHỐC"),
+        (r"(?i)(họ\s+tên|ho\s+ten|patient\s+name|name)", "HỌTÊN"),
+        (r"(?i)(tuổi|tuoi|age)", "TUỔI"),
+        (r"(?i)(chẩn\s+đoán|chuẩn\s+đoán|chan\s+doan|diagnosis)", "CHẨNĐOÁN"),
+        (r"(?i)(huyết\s+áp|huyet\s+ap|blood\s+pressure|bp)", "HUYẾTÁP"),
+        (r"(?i)(thân\s+nhiệt|than\s+nhiet|temperature)", "THÂNHIỆT"),
+        (r"(?i)(địa\s+chỉ|dia\s+chi|address)", "ĐỊACHỈ"),
+        (r"(?i)(điện\s+thoại|dien\s+thoai|phone)", "ĐIENȚHOẠI"),
+        (r"(?i)(điều\s+trị|dieu\s+tri|treatment|liều)", "LIỄUTRỊ"),
+    ]
+    
+    lines = text.split('\n')
+    organized = []
+    current_section = "KHÁC"
+    current_content = []
+    
+    for line in lines:
+        line_stripped = line.strip()
+        if not line_stripped:
+            continue
+        
+        # Check if line is a section header
+        section_found = False
+        for pattern, section_name in sections_patterns:
+            if re.search(pattern, line_stripped):
+                # Save previous section if exists
+                if current_content and current_section != "KHÁC":
+                    organized.append(f"{current_section}: {' '.join(current_content)}")
+                    current_content = []
+                
+                # Check if line has value after header
+                match = re.search(r"[:\s](.+)$", line_stripped)
+                if match:
+                    value = match.group(1).strip()
+                    if value:
+                        organized.append(f"{section_name}: {value}")
+                    else:
+                        current_section = section_name
+                else:
+                    current_section = section_name
+                
+                section_found = True
+                break
+        
+        if not section_found:
+            # This is content line, not a header
+            if line_stripped:
+                current_content.append(line_stripped)
+    
+    # Save last section if has content
+    if current_content and current_section != "KHÁC":
+        organized.append(f"{current_section}: {' '.join(current_content)}")
+    
+    # Join with proper formatting
+    return '\n'.join(organized) if organized else text
+
+
 def _extract_with_confidence(image, lang, config):
     raw_text = pytesseract.image_to_string(image, lang=lang, config=config, timeout=45)
     text = _post_process_text(raw_text)
@@ -396,7 +460,7 @@ def extract_text(image_path):
                     logger.info("OCR variant=%s psm=%d: score=%.1f, len=%d", variant_name, psm_mode, score, len(text or ''))
                     
                     if text and score >= 5:  # Lower threshold to accept more text
-                        return text
+                        return _organize_prescription_sections(text)
                     
                     if text and score > best_score:
                         best_score = score
@@ -419,7 +483,7 @@ def extract_text(image_path):
                                 logger.info("OCR crop variant=%s psm=%d: score=%.1f, len=%d", variant_name, psm_mode, score, len(text or ''))
                                 
                                 if text and score >= 5:
-                                    return text
+                                    return _organize_prescription_sections(text)
                                 
                                 if text and score > best_score:
                                     best_score = score
@@ -440,7 +504,7 @@ def extract_text(image_path):
                     raw = _post_process_text(raw)
                     if raw and len(raw.strip()) >= 5:
                         logger.info("OCR gray psm=%d: len=%d", psm_mode, len(raw))
-                        return raw
+                        return _organize_prescription_sections(raw)
                 except Exception as e:
                     logger.warning("OCR gray psm=%d error: %s", psm_mode, e)
         except Exception as e:
@@ -449,7 +513,7 @@ def extract_text(image_path):
         # Return best result found, even if score is low
         if best_text:
             logger.info("OCR: returning best result with score=%.1f", best_score)
-            return best_text
+            return _organize_prescription_sections(best_text)
 
         return "Không thể trích xuất văn bản rõ ràng từ ảnh. Hãy thử ảnh rõ hơn hoặc chụp thẳng góc."
     except pytesseract.TesseractNotFoundError:
