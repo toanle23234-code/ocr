@@ -1126,11 +1126,14 @@ def process_uploaded_file(file_storage):
     try:
         file_storage.save(filepath)
         text = extract_text(filepath)
+        app.logger.info("OCR result length=%d, preview=%.200s", len(str(text)), str(text)[:200])
 
-        if str(text).startswith("Lỗi:") or str(text).startswith("Không thể"):
-            return None, text, 500
+        text_str = str(text)
+        if text_str.startswith("Lỗi:") or text_str.startswith("Không thể") or text_str.startswith("Đã xảy ra lỗi"):
+            return None, text_str, 500
 
         if not has_scannable_text(str(text)):
+            app.logger.warning("OCR text rejected by has_scannable_text: len=%d, text=%.100s", len(str(text)), str(text)[:100])
             return None, "Hình ảnh của bạn không thể quét. Vui lòng chọn ảnh đơn thuốc rõ chữ.", 422
 
         return {"text": text, "filename": original_name}, None, 200

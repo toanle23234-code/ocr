@@ -237,26 +237,31 @@ def _build_language_list():
     return ["eng"]
 
 def extract_text(image_path):
+    import logging
+    logger = logging.getLogger(__name__)
     img_array = np.fromfile(image_path, dtype=np.uint8)
     img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
     if img is None:
         return "Không thể đọc ảnh. Kiểm tra lại đường dẫn file."
+    logger.info("OCR: image loaded, shape=%s", img.shape)
 
     try:
         languages = _build_language_list()
         lang = languages[0] if languages else "vie+eng"
         config = r"--oem 1 --psm 6 -c preserve_interword_spaces=1 -c user_defined_dpi=300"
         text = None
+        logger.info("OCR: lang=%s, languages_available=%s", lang, languages)
 
         # Lần 1: Chỉ 1 lần Tesseract duy nhất trên ảnh gốc + OTSU
         variants = preprocess_variants(img)
         _, processed = variants[0]
         try:
             text, score = _extract_with_confidence(processed, lang=lang, config=config)
+            logger.info("OCR pass1: score=%.1f, len=%d, preview=%.100s", score, len(text or ''), (text or '')[:100])
             if text and score >= 20:
                 return text
-        except RuntimeError:
-            pass
+        except RuntimeError as e:
+            logger.warning("OCR pass1 RuntimeError: %s", e)
 
         # Lần 2 (fallback): Thử crop document rồi OCR
         try:
@@ -265,12 +270,13 @@ def extract_text(image_path):
                 variants_c = preprocess_variants(cropped)
                 _, proc_c = variants_c[0]
                 text2, score2 = _extract_with_confidence(proc_c, lang=lang, config=config)
+                logger.info("OCR pass2: score=%.1f, len=%d", score2, len(text2 or ''))
                 if text2 and score2 >= 20:
                     return text2
                 if text2 and (not text or len(text2) > len(text)):
                     text = text2
-        except (RuntimeError, Exception):
-            pass
+        except (RuntimeError, Exception) as e:
+            logger.warning("OCR pass2 error: %s", e)
 
         # Lần 3 (fallback cuối): OCR trực tiếp ảnh grayscale không xử lý
         try:
