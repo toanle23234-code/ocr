@@ -2471,8 +2471,6 @@ function normalizeOcrLine(rawLine) {
     line = line.replace(/\bTrua\b/g, 'Trưa');
     line = line.replace(/\btrua\b/g, 'trưa');
     line = line.replace(/\bSang\b(?=\s*\d)/g, 'Sáng');
-    // OCR hay nhầm "Smi" (hoặc "smi") thành liều "5ml"
-    line = line.replace(/\b[Ss]mi\b/g, '5ml');
     line = line.replace(/\blan\/ngay\b/gi, 'lần/ngày');
     line = line.replace(/\blan\/ngày\b/gi, 'lần/ngày');
     line = line.replace(/\blần\/ngay\b/gi, 'lần/ngày');
@@ -2730,17 +2728,24 @@ function extractOcrSectionsForView(formattedText) {
     const pushAdminFieldFromWholeText = (label, regex) => {
         const match = normalizedWholeText.match(regex);
         if (!match || !match[1]) return;
-        const value = match[1].replace(/\s{2,}/g, ' ').trim();
+        let value = match[1].replace(/\s{2,}/g, ' ').trim();
+
+        // Prevent medicine block from being glued into admin fields.
+        value = value
+            .replace(/\s+(?=Danh mục thuốc\s*:|STT\b).*/i, '')
+            .replace(/\s+(?=(?:\d{1,2}|[Ss])\s*(?:[\/\.)\-]|[Gg])\s*[A-Za-zÀ-ỹ]).*/i, '')
+            .trim();
+
         if (!value) return;
         sections.admin.push(`${label}: ${value}`);
     };
 
     // OCR thường dính nhiều trường trên một dòng, cần tách cưỡng bức theo toàn văn.
-    pushAdminFieldFromWholeText('Họ tên', /(?:họ\s*tên|ho\s*ten|h[oọ]\s*t[eê]n|tên\s*bệnh\s*nhân)\s*[:\-]?\s*([^:;]+?)(?=\s+(?:NS|Năm\s*sinh|Tuổi|Giới\s*tính|Địa\s*chỉ|Điện\s*thoại|Sinh\s*hiệu|Thân\s*nhiệt|Huyết\s*áp|Cân\s*nặng|Chẩn\s*đoán|Điều\s*trị)\s*:?|$)/i);
-    pushAdminFieldFromWholeText('NS', /(?:\bNS\b|Năm\s*sinh)\s*[:\-]?\s*(.+?)(?=\s+(?:Tuổi|Giới\s*tính|Địa\s*chỉ|Điện\s*thoại|Sinh\s*hiệu|Thân\s*nhiệt|Huyết\s*áp|Cân\s*nặng|Chẩn\s*đoán|Điều\s*trị)\s*:?|$)/i);
-    pushAdminFieldFromWholeText('Cân nặng', /(?:Cân\s*nặng)\s*:?\s*(.+?)(?=\s+(?:Sinh\s*hiệu|Thân\s*nhiệt|Huyết\s*áp|Chẩn\s*đoán|Điều\s*trị|Bệnh\s*kèm\s*theo)\s*:|$)/i);
-    pushAdminFieldFromWholeText('Địa chỉ', /(?:Địa\s*chỉ)\s*:?\s*(.+?)(?=\s+(?:Điện\s*thoại|Sinh\s*hiệu|Thân\s*nhiệt|Huyết\s*áp|Chẩn\s*đoán|Điều\s*trị)\s*:|$)/i);
-    pushAdminFieldFromWholeText('Điện thoại', /(?:Điện\s*thoại)\s*:?\s*(.+?)(?=\s+(?:Sinh\s*hiệu|Thân\s*nhiệt|Huyết\s*áp|Chẩn\s*đoán|Điều\s*trị)\s*:|$)/i);
+    pushAdminFieldFromWholeText('Họ tên', /(?:họ\s*tên|ho\s*ten|h[oọ]\s*t[eê]n|tên\s*bệnh\s*nhân)\s*[:\-]?\s*([^:;]+?)(?=\s+(?:NS|Năm\s*sinh|Tuổi|Giới\s*tính|Địa\s*chỉ|Điện\s*thoại|Sinh\s*hiệu|Thân\s*nhiệt|Huyết\s*áp|Cân\s*nặng|Chẩn\s*đoán|Điều\s*trị|Danh\s*mục\s*thuốc|STT)\s*:?|\s+(?:(?:\d{1,2}|[Ss])\s*(?:[\/\.)\-]|[Gg]))|$)/i);
+    pushAdminFieldFromWholeText('NS', /(?:\bNS\b|Năm\s*sinh)\s*[:\-]?\s*(.+?)(?=\s+(?:Tuổi|Giới\s*tính|Địa\s*chỉ|Điện\s*thoại|Sinh\s*hiệu|Thân\s*nhiệt|Huyết\s*áp|Cân\s*nặng|Chẩn\s*đoán|Điều\s*trị|Danh\s*mục\s*thuốc|STT)\s*:?|\s+(?:(?:\d{1,2}|[Ss])\s*(?:[\/\.)\-]|[Gg]))|$)/i);
+    pushAdminFieldFromWholeText('Cân nặng', /(?:Cân\s*nặng)\s*:?\s*(.+?)(?=\s+(?:Sinh\s*hiệu|Thân\s*nhiệt|Huyết\s*áp|Chẩn\s*đoán|Điều\s*trị|Bệnh\s*kèm\s*theo|Danh\s*mục\s*thuốc|STT)\s*:?|\s+(?:(?:\d{1,2}|[Ss])\s*(?:[\/\.)\-]|[Gg]))|$)/i);
+    pushAdminFieldFromWholeText('Địa chỉ', /(?:Địa\s*chỉ)\s*:?\s*(.+?)(?=\s+(?:Điện\s*thoại|Sinh\s*hiệu|Thân\s*nhiệt|Huyết\s*áp|Chẩn\s*đoán|Điều\s*trị|Danh\s*mục\s*thuốc|STT)\s*:?|\s+(?:(?:\d{1,2}|[Ss])\s*(?:[\/\.)\-]|[Gg]))|$)/i);
+    pushAdminFieldFromWholeText('Điện thoại', /(?:Điện\s*thoại)\s*:?\s*(.+?)(?=\s+(?:Sinh\s*hiệu|Thân\s*nhiệt|Huyết\s*áp|Chẩn\s*đoán|Điều\s*trị|Danh\s*mục\s*thuốc|STT)\s*:?|\s+(?:(?:\d{1,2}|[Ss])\s*(?:[\/\.)\-]|[Gg]))|$)/i);
 
     let inMedicine = false;
     for (const line of expandedLines) {
@@ -2979,14 +2984,6 @@ function parseMedicineGuideItems(formattedText) {
                 if (dosageKw) {
                     inlineDosagePart = namePart.slice(dosageKw.index).trim();
                     namePart = namePart.slice(0, dosageKw.index).trim();
-
-                    // Recover quantity placed inside inline dosage
-                    // e.g. "uống sau ăn) 06 Viên"
-                    const qtyInInlineDosage = inlineDosagePart.match(quantityTailPattern);
-                    if (qtyInInlineDosage) {
-                        quantityPart = quantityPart || qtyInInlineDosage[1].trim();
-                        inlineDosagePart = inlineDosagePart.slice(0, qtyInInlineDosage.index).trim();
-                    }
                 }
                 const qtyMatch = namePart.match(quantityTailPattern);
                 if (qtyMatch) {
