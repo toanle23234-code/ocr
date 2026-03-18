@@ -2,6 +2,7 @@ services:
   - type: web
     name: prescription-ocr-backend
     runtime: docker
+    dockerfilePath: ./Dockerfile
     envVars:
       - key: SECRET_KEY
         generateValue: true
@@ -10,4 +11,4 @@ services:
       - key: FLASK_ENV
         value: production
       - key: ALLOW_DEV_OTP_FALLBACK
-        value: true
+        value: "true"
