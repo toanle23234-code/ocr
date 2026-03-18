@@ -182,7 +182,7 @@ def _post_process_text(text):
 
 
 def _extract_with_confidence(image, lang, config):
-    raw_text = pytesseract.image_to_string(image, lang=lang, config=config, timeout=15)
+    raw_text = pytesseract.image_to_string(image, lang=lang, config=config, timeout=45)
     text = _post_process_text(raw_text)
     score = _score_ocr_text(text, 0.0)
     return text, score
@@ -258,7 +258,7 @@ def extract_text(image_path):
         try:
             text, score = _extract_with_confidence(processed, lang=lang, config=config)
             logger.info("OCR pass1: score=%.1f, len=%d, preview=%.100s", score, len(text or ''), (text or '')[:100])
-            if text and score >= 20:
+            if text and score >= 10:
                 return text
         except RuntimeError as e:
             logger.warning("OCR pass1 RuntimeError: %s", e)
@@ -271,7 +271,7 @@ def extract_text(image_path):
                 _, proc_c = variants_c[0]
                 text2, score2 = _extract_with_confidence(proc_c, lang=lang, config=config)
                 logger.info("OCR pass2: score=%.1f, len=%d", score2, len(text2 or ''))
-                if text2 and score2 >= 20:
+                if text2 and score2 >= 10:
                     return text2
                 if text2 and (not text or len(text2) > len(text)):
                     text = text2
@@ -284,7 +284,7 @@ def extract_text(image_path):
             gray_fb = _resize_for_ocr(gray_fb)
             raw = pytesseract.image_to_string(gray_fb, lang=lang,
                 config=r"--oem 1 --psm 3 -c preserve_interword_spaces=1 -c user_defined_dpi=300",
-                timeout=15)
+                timeout=45)
             raw = _post_process_text(raw)
             if raw and len(raw.strip()) >= 10:
                 return raw

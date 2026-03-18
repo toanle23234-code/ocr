@@ -1108,7 +1108,7 @@ def has_scannable_text(text):
 
     alnum_count = len(re.findall(r"[A-Za-zÀ-ỹ0-9]", normalized))
     token_count = len([t for t in normalized.split(" ") if t])
-    return alnum_count >= 12 and token_count >= 3
+    return alnum_count >= 8 and token_count >= 2
 
 
 def process_uploaded_file(file_storage):
