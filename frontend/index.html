@@ -2471,6 +2471,8 @@ function normalizeOcrLine(rawLine) {
     line = line.replace(/\bTrua\b/g, 'Trưa');
     line = line.replace(/\btrua\b/g, 'trưa');
     line = line.replace(/\bSang\b(?=\s*\d)/g, 'Sáng');
+    // OCR hay nhầm "Smi" (hoặc "smi") thành liều "5ml"
+    line = line.replace(/\b[Ss]mi\b/g, '5ml');
     line = line.replace(/\blan\/ngay\b/gi, 'lần/ngày');
     line = line.replace(/\blan\/ngày\b/gi, 'lần/ngày');
     line = line.replace(/\blần\/ngay\b/gi, 'lần/ngày');
@@ -2977,6 +2979,14 @@ function parseMedicineGuideItems(formattedText) {
                 if (dosageKw) {
                     inlineDosagePart = namePart.slice(dosageKw.index).trim();
                     namePart = namePart.slice(0, dosageKw.index).trim();
+
+                    // Recover quantity placed inside inline dosage
+                    // e.g. "uống sau ăn) 06 Viên"
+                    const qtyInInlineDosage = inlineDosagePart.match(quantityTailPattern);
+                    if (qtyInInlineDosage) {
+                        quantityPart = quantityPart || qtyInInlineDosage[1].trim();
+                        inlineDosagePart = inlineDosagePart.slice(0, qtyInInlineDosage.index).trim();
+                    }
                 }
                 const qtyMatch = namePart.match(quantityTailPattern);
                 if (qtyMatch) {
