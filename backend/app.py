@@ -1108,7 +1108,57 @@ def has_scannable_text(text):
 
     alnum_count = len(re.findall(r"[A-Za-zÀ-ỹ0-9]", normalized))
     token_count = len([t for t in normalized.split(" ") if t])
-    return alnum_count >= 8 and token_count >= 2
+    
+    # More lenient for prescription documents
+    medical_keywords = [
+        "đơn thuốc", "họ tên", "tuổi", "chẩn đoán", "điều trị", "liều", "ngày", 
+        "uống", "sáng", "chiều", "tối", "huyết áp", "thân nhiệt", "viên", "ống", 
+        "mg", "ml", "lần/ngày", "toa", "đơn", "thuốc"
+    ]
+    
+    # Normalize for keyword matching (remove accents for matching)
+    normalized_lower = re.sub(r"\s+", " ", (text or "").lower()).strip()
+    has_medical_keyword = any(kw in normalized_lower for kw in medical_keywords)
+    
+    # Accept if:
+    # 1. Has enough chars (8+) AND tokens (2+) - generic validation
+    # 2. OR has medical keyword AND reasonable length (5+)
+    # This allows flexible prescription detection while avoiding false positives
+    return (alnum_count >= 8 and token_count >= 2) or (has_medical_keyword and alnum_count >= 5)
+
+
+def format_prescription_output(text):
+    """Format OCR prescription text for better readability"""
+    if not text:
+        return text
+    
+    formatted = str(text)
+    
+    # Add line breaks after common section headers
+    section_headers = [
+        r"(?i)^(đơn thuốc\s*:?)",
+        r"(?i)^(họ tên\s*:?)",
+        r"(?i)^(tuổi\s*:?)",
+        r"(?i)^(chẩn đoán\s*:?)",
+        r"(?i)^(điều trị\s*:?)",
+        r"(?i)^(huyết áp\s*:?)",
+        r"(?i)^(thân nhiệt\s*:?)",
+        r"(?i)^(địa chỉ\s*:?)",
+        r"(?i)^(điện thoại\s*:?)",
+        r"(?i)^(liều\s*:?)",
+    ]
+    
+    # Normalize multiple spaces to single space
+    formatted = re.sub(r"[ \t]+", " ", formatted)
+    
+    # Fix common spacing issues
+    formatted = re.sub(r"(\d+)\s+([mM][gG]|[mM][lL]|[uU][iI])\b", r"\1 \2", formatted)
+    formatted = re.sub(r"(\d+)\s+([a-z]{2,})\s*/\s*", r"\1 \2/", formatted, flags=re.IGNORECASE)
+    
+    return formatted.strip()
+
+
+
 
 
 def process_uploaded_file(file_storage):
@@ -1132,11 +1182,17 @@ def process_uploaded_file(file_storage):
         if text_str.startswith("Lỗi:") or text_str.startswith("Không thể") or text_str.startswith("Đã xảy ra lỗi"):
             return None, text_str, 500
 
-        if not has_scannable_text(str(text)):
-            app.logger.warning("OCR text rejected by has_scannable_text: len=%d, text=%.100s", len(str(text)), str(text)[:100])
+        # Apply medical glossary to improve text quality (translate English terms)
+        text_str = apply_medical_glossary(text_str)
+        
+        # Format the prescription output for better readability
+        text_str = format_prescription_output(text_str)
+        
+        if not has_scannable_text(str(text_str)):
+            app.logger.warning("OCR text rejected by has_scannable_text: len=%d, text=%.100s", len(str(text_str)), str(text_str)[:100])
             return None, "Hình ảnh của bạn không thể quét. Vui lòng chọn ảnh đơn thuốc rõ chữ.", 422
 
-        return {"text": text, "filename": original_name}, None, 200
+        return {"text": text_str, "filename": original_name}, None, 200
     finally:
         if os.path.exists(filepath):
             os.remove(filepath)

@@ -141,23 +141,107 @@ def _post_process_text(text):
         (r"\buéng\b", "uống"),
         (r"\bUêng\b", "Uống"),
         (r"\buêng\b", "uống"),
+        (r"\bUong\b", "Uống"),
+        (r"\buong\b", "uống"),
+        (r"\bUñng\b", "Uống"),
+        (r"\buñng\b", "uống"),
+        (r"\bUệng\b", "Uống"),
+        (r"\buệng\b", "uống"),
         (r"\bVién\b", "Viên"),
         (r"\bvién\b", "viên"),
         (r"\bViẻn\b", "Viên"),
         (r"\bviẻn\b", "viên"),
-        (r"\bSang\b(?=\s*\d)", "Sáng"),
+        (r"\bVien\b", "Viên"),
+        (r"\bvien\b", "viên"),
+        (r"\bViền\b", "Viên"),
+        (r"\bviền\b", "viên"),
+        (r"\bVỉen\b", "Viên"),
+        (r"\bvỉen\b", "viên"),
+        (r"\bSang\b(?=\s+\d|$)", "Sáng"),
+        (r"\bSáng\b(?=\s+\d|$)", "Sáng"),
         (r"\bChiéu\b", "Chiều"),
         (r"\bchiéu\b", "chiều"),
+        (r"\bChieu\b", "Chiều"),
+        (r"\bchieu\b", "chiều"),
+        (r"\bChie\b", "Chiều"),
+        (r"\bchie\b", "chiều"),
         (r"\bTrua\b", "Trưa"),
         (r"\btrua\b", "trưa"),
-        (r"\bTôi\b(?=\s*\d)", "Tối"),
+        (r"\bTrưa\b", "Trưa"),
+        (r"\btrưa\b", "trưa"),
+        (r"\bTrừa\b", "Trưa"),
+        (r"\btrừa\b", "trưa"),
+        (r"\bTôi\b(?=\s+\d|$)", "Tối"),
+        (r"\btôi\b(?=\s+\d|$)", "tối"),
+        (r"\bToi\b(?=\s+\d|$)", "Tối"),
+        (r"\btoi\b(?=\s+\d|$)", "tối"),
+        (r"\bTỏi\b(?=\s+\d|$)", "Tối"),
+        (r"\btỏi\b(?=\s+\d|$)", "tối"),
         (r"\bNgay\b(?=\s*\d)", "Ngày"),
         (r"\bngay\b(?=\s*\d)", "ngày"),
+        (r"\bNgày\b", "Ngày"),
+        (r"\bngày\b", "ngày"),
+        (r"\bNghay\b", "Ngày"),
+        (r"\bnghay\b", "ngày"),
         (r"\blan/ngay\b", "lần/ngày"),
         (r"\blan/ngày\b", "lần/ngày"),
         (r"\blần/ngay\b", "lần/ngày"),
+        (r"\bLan/ngay\b", "Lần/ngày"),
+        (r"\bLan/ngày\b", "Lần/ngày"),
+        (r"\bLần/ngay\b", "Lần/ngày"),
         (r"\bduoi\s+dang\b", "dưới dạng"),
         (r"\bdưoi\s+dạng\b", "dưới dạng"),
+        (r"\bDuoi\s+dang\b", "Dưới dạng"),
+        (r"\bDưoi\s+dạng\b", "Dưới dạng"),
+        (r"\bduom\b", "dưới"),
+        (r"\bDon\s+thuoc\b", "Đơn thuốc"),
+        (r"\bdon\s+thuoc\b", "đơn thuốc"),
+        (r"\bDon\s+Thuoc\b", "Đơn thuốc"),
+        (r"\bĐon\s+thuoc\b", "Đơn thuốc"),
+        (r"\bđon\s+thuoc\b", "đơn thuốc"),
+        (r"\bHo\s+ten\b", "Họ tên"),
+        (r"\bho\s+ten\b", "họ tên"),
+        (r"\bHo\s+Ten\b", "Họ tên"),
+        (r"\bHô\s+tên\b", "Họ tên"),
+        (r"\bhô\s+tên\b", "họ tên"),
+        (r"\bTuoi\b", "Tuổi"),
+        (r"\btuoi\b", "tuổi"),
+        (r"\bTuôi\b", "Tuổi"),
+        (r"\btuôi\b", "tuổi"),
+        (r"\bTuỏi\b", "Tuổi"),
+        (r"\btuỏi\b", "tuổi"),
+        (r"\bChan\s+doan\b", "Chẩn đoán"),
+        (r"\bchan\s+doan\b", "chẩn đoán"),
+        (r"\bChan\s+Doan\b", "Chẩn đoán"),
+        (r"\bChuan\s+doan\b", "Chuẩn đoán"),
+        (r"\bchuan\s+doan\b", "chuẩn đoán"),
+        (r"\bChuan\s+Doan\b", "Chuẩn đoán"),
+        (r"\bHuyet\s+ap\b", "Huyết áp"),
+        (r"\bhuyet\s+ap\b", "huyết áp"),
+        (r"\bThan\s+nhiet\b", "Thân nhiệt"),
+        (r"\bthan\s+nhiet\b", "thân nhiệt"),
+        (r"\bThan\s+Nhiet\b", "Thân nhiệt"),
+        (r"\bLieu\b", "Liều"),
+        (r"\blieu\b", "liều"),
+        (r"\bLiều\b", "Liều"),
+        (r"\bliều\b", "liều"),
+        (r"\bLuong\b", "Liều"),
+        (r"\bluong\b", "liều"),
+        (r"\bSo\s+luong\b", "Số lượng"),
+        (r"\bso\s+luong\b", "số lượng"),
+        (r"\bSo\s+Luong\b", "Số lượng"),
+        (r"\bDia\s+chi\b", "Địa chỉ"),
+        (r"\bdia\s+chi\b", "địa chỉ"),
+        (r"\bDia\s+Chi\b", "Địa chỉ"),
+        (r"\bDieu\s+tri\b", "Điều trị"),
+        (r"\bdieu\s+tri\b", "điều trị"),
+        (r"\bDieu\s+Tri\b", "Điều trị"),
+        (r"\bOng\b", "Ống"),
+        (r"\bong\b", "ống"),
+        (r"\bTuip\b", "Tuýp"),
+        (r"\btuip\b", "tuýp"),
+        (r"\bTup\b", "Tuýp"),
+        (r"\btup\b", "tuýp"),
     ]
     for pattern, replacement in vi_ocr_fixes:
         text = re.sub(pattern, replacement, text)
@@ -169,6 +253,7 @@ def _post_process_text(text):
     text = re.sub(r"\s*-\s*\d+\s*-\.?", "", text)
     text = re.sub(r"\s*>>\s*", " ", text)
     text = re.sub(r"\s*<<\s*", " ", text)
+    text = re.sub(r"\s*\|\s*", " ", text)
 
     text = re.sub(r"\bmg\s*/\s*vien\b", "mg/viên", text, flags=re.IGNORECASE)
     text = re.sub(r"\b(\d+)\s*([mM][gG]|[mM][lL]|[uU][iI])\b", r"\1 \2", text)
@@ -176,8 +261,15 @@ def _post_process_text(text):
     text = re.sub(r"\b(So|Số)\s*luong\b", "Số lượng", text, flags=re.IGNORECASE)
     text = re.sub(r"\b(Don|Đơn)\s*thuoc\b", "Đơn thuốc", text, flags=re.IGNORECASE)
 
+    # Fix repeated characters (OCR noise) - keep max 2
+    text = re.sub(r"([a-z])\1{5,}", r"\1\1", text, flags=re.IGNORECASE)
+    
+    # Normalize whitespace
     text = re.sub(r"[ \t]+", " ", text)
     text = re.sub(r"\n\s*\n+", "\n", text)
+    text = re.sub(r" +\n", "\n", text)
+    text = re.sub(r"\n +", "\n", text)
+    
     return text.strip()
 
 
@@ -202,9 +294,16 @@ def _score_ocr_text(text, avg_conf):
     line_count = len([ln for ln in text.splitlines() if len(ln.strip()) >= 3])
 
     medical_keywords = [
-        "đơn thuốc", "ho ten", "họ tên", "tuoi", "tuổi", "chẩn đoán", "chuẩn đoán",
+        "đơn thuốc", "đơn thuocs", "ho ten", "họ tên", "tuoi", "tuổi", "chẩn đoán", "chuẩn đoán",
         "điều trị", "liều", "ngày", "uống", "sáng", "chiều", "tối", "huyết áp",
-        "thân nhiệt", "địa chỉ", "điện thoại", "viên", "ống", "ml", "mg"
+        "thân nhiệt", "địa chỉ", "điện thoại", "viên", "ống", "ml", "mg", "ui",
+        "lần/ngày", "lần/ngay", "dưới dạng", "duoi dang",
+        "sang", "chiều", "tối", "trưa", "trua",
+        "bác sĩ", "bác si", "kê đơn", "ke don", "cơ sở", "co so",
+        "thuốc", "thuoc", "bệnh", "benh", "nhân", "nhan", "bệnh nhân", "benh nhan",
+        "toa thuoc", "tòa thuốc", "toá thuốc", "đơn", "don",
+        "sáng", "sang", "chiều", "chieu", "tối", "toi", "trưa", "trua",
+        "số", "so", "lượng", "luong", "liều lượng", "don thuoc", "thuoc",
     ]
     normalized = unicodedata.normalize("NFD", text.lower())
     normalized = re.sub(r"[\u0300-\u036f]", "", normalized)
@@ -248,7 +347,7 @@ def extract_text(image_path):
     try:
         languages = _build_language_list()
         lang = languages[0] if languages else "vie+eng"
-        config = r"--oem 1 --psm 6 -c preserve_interword_spaces=1 -c user_defined_dpi=300"
+        config = r"--oem 1 --psm 11 -c preserve_interword_spaces=1 -c user_defined_dpi=300"
         text = None
         logger.info("OCR: lang=%s, languages_available=%s", lang, languages)
 
@@ -283,7 +382,7 @@ def extract_text(image_path):
             gray_fb = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
             gray_fb = _resize_for_ocr(gray_fb)
             raw = pytesseract.image_to_string(gray_fb, lang=lang,
-                config=r"--oem 1 --psm 3 -c preserve_interword_spaces=1 -c user_defined_dpi=300",
+                config=r"--oem 1 --psm 11 -c preserve_interword_spaces=1 -c user_defined_dpi=300",
                 timeout=45)
             raw = _post_process_text(raw)
             if raw and len(raw.strip()) >= 10:
