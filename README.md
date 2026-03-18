@@ -7,6 +7,11 @@
 ## Đường link demo đến trang web 
 https://prescription-ocr-project.onrender.com/ 
 
+**Ảnh ví dụ:**
+
+![Ảnh ví dụ](docs/images/prescription-example.png)
+
+
 
 ## Tính năng chính
 
