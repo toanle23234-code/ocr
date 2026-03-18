@@ -23,6 +23,9 @@ COPY . .
 # Tạo sẵn các thư mục cần thiết
 RUN mkdir -p uploads/avatars database data
 
+# Verify tesseract is installed correctly
+RUN tesseract --version
+
 # Render sẽ tự set biến PORT, mặc định 10000
 EXPOSE 10000
 
