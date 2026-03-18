@@ -29,18 +29,18 @@ if tesseract_path:
 def _resize_for_ocr(gray):
     h, w = gray.shape[:2]
     max_side = max(h, w)
-    # Cap tối đa 1600px để giảm thời gian Tesseract trên server yếu
-    target = 1600
-    if max_side < target:
-        scale = target / max_side
-        new_w = int(w * scale)
-        new_h = int(h * scale)
-        return cv2.resize(gray, (new_w, new_h), interpolation=cv2.INTER_CUBIC)
-    elif max_side > 2400:
-        scale = 2400 / max_side
+    # Cap 900px: nhanh nhất cho Render free tier 0.1 vCPU
+    cap = 900
+    if max_side > cap:
+        scale = cap / max_side
         new_w = int(w * scale)
         new_h = int(h * scale)
         return cv2.resize(gray, (new_w, new_h), interpolation=cv2.INTER_AREA)
+    if max_side < 500:
+        scale = 500 / max_side
+        new_w = int(w * scale)
+        new_h = int(h * scale)
+        return cv2.resize(gray, (new_w, new_h), interpolation=cv2.INTER_CUBIC)
     return gray
 
 
@@ -118,43 +118,10 @@ def _auto_crop_document(img):
 def preprocess_variants(img):
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     gray = _resize_for_ocr(gray)
-    gray = _deskew(gray)
-
-    denoise = cv2.fastNlMeansDenoising(gray, None, 9, 7, 21)
-    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8)).apply(denoise)
-
-    sharpen_kernel = np.array([[0, -1, 0],
-                               [-1, 5, -1],
-                               [0, -1, 0]])
-    sharp = cv2.filter2D(clahe, -1, sharpen_kernel)
-
-    otsu = cv2.threshold(sharp, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
-    adaptive_mean = cv2.adaptiveThreshold(
-        sharp,
-        255,
-        cv2.ADAPTIVE_THRESH_MEAN_C,
-        cv2.THRESH_BINARY,
-        31,
-        11,
-    )
-    adaptive_gauss = cv2.adaptiveThreshold(
-        sharp,
-        255,
-        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-        cv2.THRESH_BINARY,
-        31,
-        9,
-    )
-    morph_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
-    morph_close = cv2.morphologyEx(otsu, cv2.MORPH_CLOSE, morph_kernel, iterations=1)
-    bordered = cv2.copyMakeBorder(sharp, 16, 16, 16, 16, cv2.BORDER_REPLICATE)
-
-    return [
-        ("otsu", otsu),
-        ("adaptive_gauss", adaptive_gauss),
-        ("clahe", clahe),
-        ("bordered", bordered),
-    ]
+    # Bỏ deskew và bilateral filter — quá chậm trên 0.1 vCPU
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8)).apply(gray)
+    otsu = cv2.threshold(clahe, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
+    return [("otsu", otsu)]
 
 
 def _post_process_text(text):
@@ -215,7 +182,7 @@ def _post_process_text(text):
 
 
 def _extract_with_confidence(image, lang, config):
-    raw_text = pytesseract.image_to_string(image, lang=lang, config=config, timeout=20)
+    raw_text = pytesseract.image_to_string(image, lang=lang, config=config, timeout=15)
     text = _post_process_text(raw_text)
     score = _score_ocr_text(text, 0.0)
     return text, score
@@ -276,64 +243,48 @@ def extract_text(image_path):
         return "Không thể đọc ảnh. Kiểm tra lại đường dẫn file."
 
     try:
-        cropped_img = _auto_crop_document(img)
-        source_images = [img]
-        if cropped_img.shape[:2] != img.shape[:2]:
-            source_images.append(cropped_img)
-
         languages = _build_language_list()
-        # Giảm xuống 2 config tốt nhất để chạy nhanh trên free tier
-        configs = [
-            r"--oem 1 --psm 6 -c preserve_interword_spaces=1 -c user_defined_dpi=300",
-            r"--oem 1 --psm 4 -c preserve_interword_spaces=1 -c user_defined_dpi=300",
-        ]
+        lang = languages[0] if languages else "vie+eng"
+        config = r"--oem 1 --psm 6 -c preserve_interword_spaces=1 -c user_defined_dpi=300"
 
-        best_text = ""
-        best_score = -1.0
-        attempts = 0
-        max_attempts = 4
-
-        for source in source_images:
-            variants = preprocess_variants(source)
-            for _, processed in variants:
-                for lang in languages:
-                    for config in configs:
-                        attempts += 1
-                        if attempts > max_attempts:
-                            break
-                        try:
-                            text, score = _extract_with_confidence(processed, lang=lang, config=config)
-                        except RuntimeError:
-                            # Tesseract timeout for this pass; continue with remaining strategies.
-                            continue
-
-                        if score > best_score and text:
-                            best_score = score
-                            best_text = text
-                            # Fast early-stop when text quality is already good.
-                            if best_score >= 70:
-                                return best_text
-                    if attempts > max_attempts:
-                        break
-                if attempts > max_attempts:
-                    break
-            if attempts > max_attempts:
-                break
-
-        if best_text:
-            return best_text
-
-        # Fallback: thử OCR trực tiếp trên ảnh gốc không qua preprocessing
+        # Lần 1: Chỉ 1 lần Tesseract duy nhất trên ảnh gốc + OTSU
+        variants = preprocess_variants(img)
+        _, processed = variants[0]
         try:
-            lang_fb = languages[0] if languages else "vie+eng"
-            raw = pytesseract.image_to_string(img, lang=lang_fb,
-                config=r"--oem 3 --psm 3 -c preserve_interword_spaces=1",
-                timeout=25)
+            text, score = _extract_with_confidence(processed, lang=lang, config=config)
+            if text and score >= 20:
+                return text
+        except RuntimeError:
+            pass
+
+        # Lần 2 (fallback): Thử crop document rồi OCR
+        try:
+            cropped = _auto_crop_document(img)
+            if cropped.shape[:2] != img.shape[:2]:
+                variants_c = preprocess_variants(cropped)
+                _, proc_c = variants_c[0]
+                text2, score2 = _extract_with_confidence(proc_c, lang=lang, config=config)
+                if text2 and score2 >= 20:
+                    return text2
+        except (RuntimeError, Exception):
+            pass
+
+        # Lần 3 (fallback cuối): OCR trực tiếp ảnh grayscale không xử lý
+        try:
+            gray_fb = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            gray_fb = _resize_for_ocr(gray_fb)
+            raw = pytesseract.image_to_string(gray_fb, lang=lang,
+                config=r"--oem 1 --psm 3 -c preserve_interword_spaces=1 -c user_defined_dpi=300",
+                timeout=15)
             raw = _post_process_text(raw)
             if raw and len(raw.strip()) >= 10:
                 return raw
         except Exception:
             pass
+
+        # Trả về kết quả tốt nhất dù điểm thấp
+        if text:
+            return text
 
         return "Không thể trích xuất văn bản rõ ràng từ ảnh. Hãy thử ảnh rõ hơn hoặc chụp thẳng góc."
     except pytesseract.TesseractNotFoundError:

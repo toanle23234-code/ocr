@@ -200,7 +200,10 @@ def init_db():
     }
     for column_name, column_type in optional_columns.items():
         if column_name not in existing_columns:
-            cursor.execute(f"ALTER TABLE users ADD COLUMN {column_name} {column_type}")
+            try:
+                cursor.execute(f"ALTER TABLE users ADD COLUMN {column_name} {column_type}")
+            except Exception:
+                pass  # Column đã được worker khác thêm trước (race condition)
 
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS scan_history (
