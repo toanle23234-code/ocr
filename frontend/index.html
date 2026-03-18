@@ -2903,7 +2903,9 @@ function parseMedicineGuideItems(formattedText) {
         // Handles common OCR mistakes: "S/" (for 5/) and "6G" (for 6/).
         const normalized = normalizeOcrLine(line)
             .replace(/\s+(?=((?:\d{1,2}|[Ss])\s*(?:[\/\.)\-])\s*[A-Za-zÀ-ỹ]))/g, '\n')
-            .replace(/\s+(?=(\d{1,2}\s*[Gg]\s+[A-Za-zÀ-ỹ]))/g, '\n');
+            .replace(/\s+(?=(\d{1,2}\s*[Gg]\s+[A-Za-zÀ-ỹ]))/g, '\n')
+            // Handle embedded index without separator: "... 1/2 6 LysinKid 45 Chai ..."
+            .replace(/\s+(?=(\d{1,2}\s+[A-ZÀ-Ỵ][A-Za-zÀ-ỹ0-9]{2,}[^\n]*\b(?:Viên|Vien|Ống|Ong|Chai|Tuýp|Tuyp|Gói|Goi|Giọt|Giot|mg|ml|UI)\b))/g, '\n');
         return normalized.split('\n').map((x) => x.trim()).filter(Boolean);
     };
 
@@ -2913,7 +2915,19 @@ function parseMedicineGuideItems(formattedText) {
     let currentItem = null;
 
     const medPattern = /^((?:\d+)|(?:[Ss]))\s*(?:[\/\.)\-]+|[Gg])\s*(.+)$/i;
-    const quantityTailPattern = /(\d+\s*(Viên|Viện|Ống|Chai|Tuýp|Tuyp|Gói|Goi|ml|mg|UI|Giọt)|(Viên|Viện|Ống|Chai|Tuýp|Tuyp|Gói|Goi|Giọt)\s*\d+)$/i;
+    const quantityTailPattern = /(\d+\s*(Viên|Vien|Viện|Ống|Ong|Chai|Tuýp|Tuyp|Gói|Goi|ml|mg|UI|Giọt|Giot)|(Viên|Vien|Viện|Ống|Ong|Chai|Tuýp|Tuyp|Gói|Goi|Giọt|Giot)\s*\d+)$/i;
+
+    const noSeparatorMedPattern = /^(\d{1,2})\s+(.+)$/;
+    const looksLikeStandaloneMedicine = (indexText, nameText) => {
+        const idx = parseInt(indexText, 10);
+        if (Number.isNaN(idx) || idx <= 0 || idx > 50) return false;
+        const name = (nameText || '').trim();
+        if (!name) return false;
+        if (/^(Sáng|Sang|Trưa|Trua|Chiều|Chieu|Tối|Toi|Uống|Uong|Thoa|Bôi|Boi|Ngày|Ngay)\b/i.test(name)) {
+            return false;
+        }
+        return /\b(Viên|Vien|Ống|Ong|Chai|Tuýp|Tuyp|Gói|Goi|Giọt|Giot|mg|ml|UI)\b/i.test(name);
+    };
 
     const looksLikeDosage = (line) => {
         const normalized = (line || '').toLowerCase();
@@ -2927,7 +2941,17 @@ function parseMedicineGuideItems(formattedText) {
         if (/^Danh mục thuốc\s*:?$/i.test(line)) continue;
         if (/^---\s*Hướng dẫn dùng thuốc\s*---$/i.test(line)) continue;
 
-        const medMatch = line.match(medPattern);
+        let medMatch = line.match(medPattern);
+        let medRemainder = medMatch ? medMatch[2] : '';
+
+        if (!medMatch) {
+            const loose = line.match(noSeparatorMedPattern);
+            if (loose && looksLikeStandaloneMedicine(loose[1], loose[2])) {
+                medMatch = [line, loose[1], loose[2]];
+                medRemainder = loose[2];
+            }
+        }
+
         if (medMatch) {
             // Only treat as medicine index if number is reasonable (1-50)
             const medIndexRaw = /^s$/i.test(medMatch[1]) ? '5' : medMatch[1];
@@ -2939,7 +2963,7 @@ function parseMedicineGuideItems(formattedText) {
                 }
                 continue;
             }
-            let namePart = medMatch[2].trim();
+            let namePart = (medRemainder || medMatch[2] || '').trim();
             let quantityPart = '';
 
             const slMatch = namePart.match(/^(.*?)\s*\|\s*SL\s*:\s*(.+)$/i);
