@@ -2497,6 +2497,9 @@ function normalizeOcrLine(rawLine) {
     });
 
     line = line
+        // OCR index fixes in medicine block: "S/" -> "5/", "6G" -> "6/"
+        .replace(/(^|\s)[Ss]\s*\/(?=\s*[A-Za-zÀ-ỹ])/g, '$15/ ')
+        .replace(/(^|\s)(\d{1,2})\s*[Gg](?=\s+[A-Za-zÀ-ỹ])/g, '$1$2/')
         .replace(/\s*:\s*/g, ': ')
         .replace(/\s*;\s*/g, '; ')
         .replace(/\s*,\s*/g, ', ')
@@ -2555,12 +2558,13 @@ function buildCompactInfoBody(patientInfoRows) {
 }
 
 function tryParseMedicineRow(line) {
-    const match = line.match(/^(\d+)\s*[\/.\-)]+\s*(.+)$/);
+    const match = line.match(/^((?:\d+)|(?:[Ss]))\s*(?:[\/\.\-)]+|[Gg])\s*(.+)$/);
     if (!match) return null;
 
     // Only treat as medicine index if number is reasonable (1-50)
     // Large numbers like 400, 500 are dosage values (mg, UI), not drug indices
-    const indexNum = parseInt(match[1], 10);
+    const sttRaw = /^s$/i.test(match[1]) ? '5' : match[1];
+    const indexNum = parseInt(sttRaw, 10);
     if (indexNum > 50) return null;
 
     let rest = match[2].trim();
@@ -2590,7 +2594,7 @@ function tryParseMedicineRow(line) {
     }
 
     return {
-        stt: match[1],
+        stt: sttRaw,
         name: rest,
         quantity,
         dosage: [],
@@ -2889,15 +2893,26 @@ function renderSectionCard(title, lines) {
 }
 
 function parseMedicineGuideItems(formattedText) {
-    const lines = (formattedText || '')
+    const baseLines = (formattedText || '')
         .split('\n')
         .map((line) => (line || '').trim())
         .filter(Boolean);
 
+    const splitEmbeddedMedicineLines = (line) => {
+        // Split when a new medicine index is embedded in the middle of a line.
+        // Handles common OCR mistakes: "S/" (for 5/) and "6G" (for 6/).
+        const normalized = normalizeOcrLine(line)
+            .replace(/\s+(?=((?:\d{1,2}|[Ss])\s*(?:[\/\.)\-])\s*[A-Za-zÀ-ỹ]))/g, '\n')
+            .replace(/\s+(?=(\d{1,2}\s*[Gg]\s+[A-Za-zÀ-ỹ]))/g, '\n');
+        return normalized.split('\n').map((x) => x.trim()).filter(Boolean);
+    };
+
+    const lines = baseLines.flatMap((line) => splitEmbeddedMedicineLines(line));
+
     const items = [];
     let currentItem = null;
 
-    const medPattern = /^(\d+)\s*[\/\.)\-]+\s*(.+)$/i;
+    const medPattern = /^((?:\d+)|(?:[Ss]))\s*(?:[\/\.)\-]+|[Gg])\s*(.+)$/i;
     const quantityTailPattern = /(\d+\s*(Viên|Viện|Ống|Chai|Tuýp|Tuyp|Gói|Goi|ml|mg|UI|Giọt)|(Viên|Viện|Ống|Chai|Tuýp|Tuyp|Gói|Goi|Giọt)\s*\d+)$/i;
 
     const looksLikeDosage = (line) => {
@@ -2915,7 +2930,8 @@ function parseMedicineGuideItems(formattedText) {
         const medMatch = line.match(medPattern);
         if (medMatch) {
             // Only treat as medicine index if number is reasonable (1-50)
-            const medIndexNum = parseInt(medMatch[1], 10);
+            const medIndexRaw = /^s$/i.test(medMatch[1]) ? '5' : medMatch[1];
+            const medIndexNum = parseInt(medIndexRaw, 10);
             if (medIndexNum > 50) {
                 // Large number — this is part of drug info, not an index
                 if (currentItem) {
@@ -2946,7 +2962,7 @@ function parseMedicineGuideItems(formattedText) {
             }
 
             currentItem = {
-                index: medMatch[1],
+                index: medIndexRaw,
                 name: namePart,
                 quantity: quantityPart,
                 dosage: inlineDosagePart ? [inlineDosagePart] : []
@@ -2958,7 +2974,20 @@ function parseMedicineGuideItems(formattedText) {
         if (!currentItem) continue;
 
         if (looksLikeDosage(line)) {
-            currentItem.dosage.push(line.replace(/^-\s*/, '').trim());
+            let dosageLine = line.replace(/^-\s*/, '').trim();
+
+            // Recover quantity if OCR put quantity in dosage line, e.g. "uống sau ăn) 06 Viên"
+            if (!currentItem.quantity) {
+                const qtyInDose = dosageLine.match(quantityTailPattern);
+                if (qtyInDose) {
+                    currentItem.quantity = qtyInDose[1].trim();
+                    dosageLine = dosageLine.slice(0, qtyInDose.index).trim();
+                }
+            }
+
+            if (dosageLine) {
+                currentItem.dosage.push(dosageLine);
+            }
             continue;
         }
 
