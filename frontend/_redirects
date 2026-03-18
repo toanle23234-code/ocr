@@ -16,5 +16,9 @@
 # Proxy API to Render backend
 /api/*  https://prescription-ocr-project-2.onrender.com/api/:splat  200
 
+# Proxy OCR upload endpoints to Render backend
+/upload  https://prescription-ocr-project-2.onrender.com/upload  200
+/upload-batch  https://prescription-ocr-project-2.onrender.com/upload-batch  200
+
 # Proxy uploads to Render backend
 /uploads/*  https://prescription-ocr-project-2.onrender.com/uploads/:splat  200

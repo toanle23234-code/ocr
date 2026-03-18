@@ -56,6 +56,19 @@
   status = 200
   force = true
 
+# ─── Proxy OCR upload endpoints sang Flask backend (Render) ───
+[[redirects]]
+  from = "/upload"
+  to = "https://prescription-ocr-project-2.onrender.com/upload"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/upload-batch"
+  to = "https://prescription-ocr-project-2.onrender.com/upload-batch"
+  status = 200
+  force = true
+
 # ─── Proxy uploads (avatar, ...) sang Flask backend ─────────
 [[redirects]]
   from = "/uploads/*"
