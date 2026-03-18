@@ -24,6 +24,10 @@ data/
 *.png
 *.jpg
 *.jpeg
+!docs/images/
+!docs/images/*.png
+!docs/images/*.jpg
+!docs/images/*.jpeg
 
 # Debug/temp files
 debug_*.py
