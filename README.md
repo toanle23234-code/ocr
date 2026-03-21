@@ -5,7 +5,7 @@
 ---
 
 ## Đường link demo đến trang web 
-https://prescription-ocr-project.onrender.com/ 
+ https://prescription-ocr.onrender.com
 
 **Ảnh ví dụ:**
 
