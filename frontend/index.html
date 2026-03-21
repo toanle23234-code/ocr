@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html class="light" lang="vi">
 <head>
     <meta charset="utf-8"/>
@@ -6,7 +6,7 @@
     <title>OCR Thuốc - Nhận dạng đơn thuốc thông minh</title>
     <link rel="icon" type="image/svg+xml" href="/frontend/brand/favicon.svg">
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Poppins:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Poppins:wght@400;500;600;700;800;900&family=Noto+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css" rel="stylesheet"/>
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
@@ -24,595 +24,13 @@
                         accent: { DEFAULT: "#22c55e", 50: "#f0fdf4", 500: "#22c55e" },
                         dark: { DEFAULT: "#0f172a", 50: "#f8fafc", 100: "#f1f5f9", 200: "#e2e8f0", 700: "#334155", 800: "#1e293b", 900: "#0f172a" }
                     },
-                    fontFamily: { display: ["Poppins", "Inter", "sans-serif"], body: ["Inter", "sans-serif"] },
+                    fontFamily: { display: ["Poppins", "Inter", "Noto Sans", "sans-serif"], body: ["Inter", "Noto Sans", "sans-serif"] },
                     borderRadius: { "2xl": "18px", "3xl": "24px" },
                 },
             },
         }
     </script>
-    <style>
-        body { font-family: 'Inter', sans-serif; overflow-x: hidden; }
-        h1,h2,h3,.font-display { font-family: 'Poppins', sans-serif; }
-
-        /* Neural Network Canvas */
-        #neuralCanvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
-
-        /* Mouse Light Effect */
-        .mouse-light { position: fixed; width: 600px; height: 600px; border-radius: 50%; pointer-events: none; z-index: 1;
-            background: radial-gradient(circle, rgba(14,165,164,0.08) 0%, transparent 70%);
-            transform: translate(-50%, -50%); transition: opacity 0.3s; }
-        .dark .mouse-light { background: radial-gradient(circle, rgba(14,165,164,0.12) 0%, transparent 70%); }
-
-        /* Glass Card */
-        .glass { background: rgba(255,255,255,0.6); backdrop-filter: blur(20px) saturate(180%); border: 1px solid rgba(255,255,255,0.3); }
-        .dark .glass { background: rgba(30,41,59,0.6); border-color: rgba(255,255,255,0.08); }
-
-        /* Sidebar */
-        .sidebar { transition: width 0.4s cubic-bezier(0.4,0,0.2,1); }
-        .sidebar.collapsed { width: 80px; }
-        .sidebar.collapsed .sidebar-text { display: none; }
-        .sidebar.collapsed .sidebar-logo-text { display: none; }
-        .sidebar.collapsed .sidebar-logo-icon { display: none; }
-        .sidebar.collapsed #sidebar-header { padding-left: 0.5rem; padding-right: 0.5rem; justify-content: center; gap: 0; }
-        .sidebar.collapsed #collapseBtn { margin: 0 auto; background: rgba(14,165,164,0.1); border-radius: 10px; padding: 8px; }
-        .sidebar.collapsed #collapseBtn:hover { background: rgba(14,165,164,0.22); }
-        .sidebar.collapsed #collapseBtn svg { color: #0ea5a4; width: 18px; height: 18px; }
-        .sidebar-link { transition: all 0.3s ease; position: relative; overflow: hidden; }
-        .sidebar-link::before { content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 3px; height: 0; background: #0ea5a4; border-radius: 0 4px 4px 0; transition: height 0.3s ease; }
-        .sidebar-link:hover::before, .sidebar-link.active::before { height: 60%; }
-        .sidebar-link:hover, .sidebar-link.active { background: rgba(14,165,164,0.08); }
-        .sidebar-link:hover svg, .sidebar-link.active svg { filter: drop-shadow(0 0 6px rgba(14,165,164,0.5)); color: #0ea5a4; }
-        .brand-logo-image {
-            width: 40px;
-            height: 40px;
-            object-fit: cover;
-            border-radius: 12px;
-            display: block;
-            box-shadow: 0 6px 14px rgba(14, 165, 164, 0.24);
-        }
-        .brand-logo-fallback {
-            width: 40px;
-            height: 40px;
-            border-radius: 12px;
-            background: linear-gradient(135deg, #60a5fa 0%, #1d4ed8 100%);
-            color: #ffffff;
-            font-size: 20px;
-            font-weight: 700;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 6px 14px rgba(29, 78, 216, 0.35);
-        }
-
-        /* Glow Effects */
-        .glow-teal { box-shadow: 0 0 30px rgba(14,165,164,0.15), 0 0 60px rgba(14,165,164,0.05); }
-        .dark .glow-teal { box-shadow: 0 0 30px rgba(14,165,164,0.25), 0 0 60px rgba(14,165,164,0.1); }
-        .glow-hover:hover { box-shadow: 0 8px 40px rgba(14,165,164,0.2), 0 0 60px rgba(14,165,164,0.08); transform: translateY(-4px); }
-
-        /* Upload Zone */
-        .upload-zone {
-            transition: all 0.4s cubic-bezier(0.4,0,0.2,1);
-            background: #ffffff !important;
-            border-color: rgba(14,165,164,0.52) !important;
-            box-shadow: 0 0 0 1px rgba(14,165,164,0.2) inset, 0 12px 26px rgba(2,132,199,0.2) !important;
-            backdrop-filter: none !important;
-            opacity: 1 !important;
-        }
-        .dark .upload-zone {
-            background: #1f2937 !important;
-            border-color: rgba(94, 234, 212, 0.82) !important;
-            box-shadow: 0 0 0 1px rgba(94,234,212,0.35) inset, 0 18px 34px rgba(2,132,199,0.35) !important;
-            backdrop-filter: none !important;
-            opacity: 1 !important;
-        }
-        .upload-zone:hover { border-color: #0ea5a4 !important; background: linear-gradient(145deg, #ffffff, #ecfeff); }
-        .dark .upload-zone:hover { background: linear-gradient(145deg, rgba(51,65,85,0.98), rgba(15,23,42,0.98)); }
-        .upload-zone.dragover { border-color: #22c55e !important; background: rgba(34,197,94,0.1); transform: scale(1.01); }
-        .upload-zone:hover .upload-icon { animation: pulse-glow 2s ease-in-out infinite; }
-        .upload-zone .click-hint {
-            background: rgba(14,165,164,0.14);
-            color: #0f766e;
-            border: 1px solid rgba(14,165,164,0.35);
-            box-shadow: 0 6px 18px rgba(14,165,164,0.18);
-        }
-        .dark .upload-zone .click-hint {
-            background: rgba(20, 184, 166, 0.28);
-            color: #ffffff;
-            border-color: rgba(94,234,212,0.7);
-            box-shadow: 0 8px 20px rgba(20,184,166,0.35);
-        }
-        .dark #uploadArea h3,
-        .dark #uploadArea p {
-            color: #ffffff !important;
-            opacity: 1 !important;
-            text-shadow: 0 1px 2px rgba(0,0,0,0.25);
-        }
-        #uploadArea h3,
-        #uploadArea p {
-            opacity: 1 !important;
-        }
-        @keyframes pulse-glow {
-            0%, 100% { filter: drop-shadow(0 0 8px rgba(14,165,164,0.3)); transform: scale(1); }
-            50% { filter: drop-shadow(0 0 20px rgba(14,165,164,0.6)); transform: scale(1.08); }
-        }
-
-        /* Scanner Animation */
-        @keyframes scan-line { 0% { top: 0; opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { top: 100%; opacity: 0; } }
-        .scan-line { position: absolute; left: 0; width: 100%; height: 2px; background: linear-gradient(90deg, transparent, #0ea5a4, transparent);
-            box-shadow: 0 0 15px rgba(14,165,164,0.6); animation: scan-line 2.5s ease-in-out infinite; }
-
-        /* Stat Cards */
-        .stat-card {
-            transition: all 0.4s cubic-bezier(0.4,0,0.2,1);
-            background: #ffffff !important;
-            border: 1px solid rgba(14,165,164,0.24);
-            box-shadow: 0 12px 28px rgba(2, 132, 199, 0.16), 0 0 0 1px rgba(255,255,255,0.9) inset !important;
-            backdrop-filter: none !important;
-            opacity: 1 !important;
-        }
-        .dark .stat-card {
-            background: #334155 !important;
-            border-color: rgba(125, 211, 252, 0.7) !important;
-            box-shadow: 0 16px 34px rgba(2, 132, 199, 0.34), 0 0 0 1px rgba(148,163,184,0.38) inset !important;
-            backdrop-filter: none !important;
-            opacity: 1 !important;
-        }
-        .stat-card:hover { transform: translateY(-6px); border-color: rgba(14,165,164,0.5); }
-        .stat-value {
-            color: #0f172a;
-            font-size: 2.4rem;
-            line-height: 1.1;
-            letter-spacing: -0.02em;
-            text-shadow: 0 1px 0 rgba(255,255,255,0.75);
-            font-weight: 900;
-        }
-        .dark .stat-value {
-            color: #ffffff !important;
-            text-shadow: 0 0 10px rgba(56, 189, 248, 0.34);
-        }
-        .stat-label {
-            color: #0f172a;
-            font-size: 1.12rem;
-            font-weight: 800;
-            line-height: 1.35;
-        }
-        .dark .stat-label { color: #ffffff !important; }
-
-        #statsSection {
-            background: #f8fafc !important;
-            border: 1px solid rgba(14, 165, 164, 0.32);
-            border-radius: 22px;
-            padding: 16px;
-            position: relative;
-            z-index: 12;
-            backdrop-filter: none !important;
-            opacity: 1 !important;
-        }
-        .dark #statsSection {
-            background: #0f172a !important;
-            border-color: rgba(94,234,212,0.45) !important;
-            box-shadow: 0 10px 24px rgba(2,132,199,0.24);
-            backdrop-filter: none !important;
-            opacity: 1 !important;
-        }
-        .dark #statsSection p,
-        .dark #statsSection span,
-        .dark #statsSection i {
-            opacity: 1 !important;
-            filter: none !important;
-        }
-
-        .stat-icon-wrap {
-            box-shadow: 0 4px 10px rgba(2,132,199,0.12);
-        }
-        .dark .stat-icon-wrap {
-            box-shadow: 0 6px 14px rgba(2,132,199,0.2);
-        }
-
-        /* Intro sections */
-        .feature-card {
-            border: 1px solid rgba(148, 163, 184, 0.28);
-            background: rgba(255, 255, 255, 0.9);
-            box-shadow: 0 12px 30px rgba(15, 23, 42, 0.10);
-            transition: all 0.35s ease;
-            position: relative;
-            z-index: 2;
-            backdrop-filter: blur(8px);
-            opacity: 1 !important;
-        }
-        .dark .feature-card {
-            background: rgba(30, 41, 59, 0.88);
-            border-color: rgba(94, 234, 212, 0.36);
-            box-shadow: 0 14px 30px rgba(2, 132, 199, 0.22), 0 0 0 1px rgba(15, 23, 42, 0.25) inset;
-        }
-        .feature-card:hover {
-            transform: translateY(-5px);
-            border-color: rgba(45, 212, 191, 0.52);
-            box-shadow: 0 18px 34px rgba(14, 165, 164, 0.18);
-        }
-        .feature-card h4 {
-            color: #0f172a;
-        }
-        .feature-card p {
-            color: #334155;
-            font-weight: 500;
-        }
-        .dark .feature-card h4 {
-            color: #f8fafc;
-        }
-        .dark .feature-card p {
-            color: #dbeafe;
-        }
-        .guide-step {
-            border: 1px solid rgba(148, 163, 184, 0.28);
-            background: rgba(255, 255, 255, 0.75);
-            box-shadow: 0 8px 22px rgba(15, 23, 42, 0.05);
-            opacity: 1 !important;
-        }
-        .dark .guide-step {
-            background: rgba(15, 23, 42, 0.62);
-            border-color: rgba(148, 163, 184, 0.28);
-            box-shadow: 0 10px 24px rgba(2, 132, 199, 0.15);
-        }
-        #featureIntroSection,
-        #usageGuideSection {
-            position: relative;
-            z-index: 3;
-        }
-        #featureIntroSection .font-display,
-        #usageGuideSection .font-display {
-            color: #0f172a;
-            text-shadow: none;
-        }
-        .dark #featureIntroSection .font-display,
-        .dark #usageGuideSection .font-display {
-            color: #f8fafc;
-            text-shadow: 0 1px 8px rgba(2, 6, 23, 0.35);
-        }
-        .guide-step h4 {
-            color: #1e293b;
-        }
-        .dark .guide-step h4 {
-            color: #f1f5f9;
-        }
-
-        @media (max-width: 1024px) {
-            .stat-value { font-size: 2.1rem; }
-            .stat-label { font-size: 1rem; }
-        }
-        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
-        @keyframes logoPulse {
-            0%   { filter: drop-shadow(0 0 0px rgba(91,179,255,0)); transform: scale(1); }
-            30%  { filter: drop-shadow(0 0 14px rgba(91,179,255,1)) drop-shadow(0 0 6px rgba(255,200,60,0.7)); transform: scale(1.22); }
-            100% { filter: drop-shadow(0 0 3px rgba(91,179,255,0.15)); transform: scale(1); }
-        }
-        .logo-pulse { animation: logoPulse 0.55s cubic-bezier(0.4,0,0.2,1) forwards; }
-        #logoIcon { cursor: pointer; }
-        .float-anim { animation: float 6s ease-in-out infinite; }
-        .float-anim-delay { animation: float 6s ease-in-out 1.5s infinite; }
-        .float-anim-delay2 { animation: float 6s ease-in-out 3s infinite; }
-
-        /* Button */
-        .btn-primary { transition: all 0.3s cubic-bezier(0.4,0,0.2,1); position: relative; overflow: hidden; }
-        .btn-primary:hover { transform: scale(1.05); box-shadow: 0 10px 40px rgba(14,165,164,0.3); }
-        .btn-primary::after { content: ''; position: absolute; inset: 0; background: linear-gradient(45deg, transparent 30%, rgba(255,255,255,0.15) 50%, transparent 70%);
-            transform: translateX(-100%); transition: transform 0.6s; }
-        .btn-primary:hover::after { transform: translateX(100%); }
-
-        /* Icon Bounce */
-        .icon-bounce:hover svg { animation: bounce-subtle 0.5s ease; }
-        @keyframes bounce-subtle { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-4px); } 60% { transform: translateY(-2px); } }
-
-        /* Dark Mode Transition */
-        * { transition: background-color 0.4s ease, border-color 0.4s ease, color 0.3s ease; }
-
-        /* Spinner */
-        .loading-spinner { width: 24px; height: 24px; border: 3px solid rgba(255,255,255,0.3); border-top-color: white;
-            border-radius: 50%; animation: spin 0.8s linear infinite; display: inline-block; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-
-        /* Scrollbar */
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: rgba(14,165,164,0.2); border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: rgba(14,165,164,0.4); }
-
-        /* History section and cards */
-        #historySection {
-            background: rgba(255, 255, 255, 0.52);
-            border: 1px solid rgba(148, 163, 184, 0.26);
-            border-radius: 22px;
-            padding: 18px;
-            box-shadow: 0 10px 26px rgba(15, 23, 42, 0.04), 0 0 0 1px rgba(255,255,255,0.45) inset;
-        }
-        .dark #historySection {
-            background: rgba(15, 23, 42, 0.42);
-            border-color: rgba(148, 163, 184, 0.24);
-            box-shadow: 0 10px 26px rgba(2, 132, 199, 0.1);
-        }
-        .history-card {
-            transition: all 0.4s cubic-bezier(0.4,0,0.2,1);
-            background: rgba(255, 255, 255, 0.78) !important;
-            border: 1px solid rgba(148, 163, 184, 0.30);
-            box-shadow: 0 6px 18px rgba(15, 23, 42, 0.05);
-        }
-        .dark .history-card {
-            background: rgba(30, 41, 59, 0.64) !important;
-            border-color: rgba(148, 163, 184, 0.28);
-            box-shadow: 0 8px 22px rgba(2, 132, 199, 0.12);
-        }
-        .history-card:hover {
-            transform: translateY(-4px);
-            border-color: rgba(20, 184, 166, 0.45);
-            box-shadow: 0 12px 34px rgba(14,165,164,0.14);
-        }
-        .ocr-section-card {
-            border-radius: 16px;
-            padding: 16px 18px;
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
-            margin-bottom: 4px;
-        }
-        .dark .ocr-section-card {
-            background: rgba(15, 23, 42, 0.55);
-            border-color: rgba(148, 163, 184, 0.18);
-            box-shadow: 0 1px 4px rgba(0,0,0,0.2);
-        }
-        .ocr-section-title {
-            font-size: 11.5px;
-            color: #0e7490;
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 0.8px;
-            margin-bottom: 10px;
-            padding-bottom: 8px;
-            border-bottom: 2px solid rgba(14, 165, 164, 0.15);
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .dark .ocr-section-title {
-            color: #67e8f9;
-            border-bottom-color: rgba(103, 232, 249, 0.15);
-        }
-        .ocr-line {
-            padding: 8px 12px;
-            border-radius: 10px;
-            background: #ffffff;
-            border: 1px solid #e2e8f0;
-            color: #334155;
-            font-size: 13.5px;
-            line-height: 1.6;
-            margin-bottom: 6px;
-            transition: background 0.15s;
-        }
-        .ocr-line:hover {
-            background: #f0fdfa;
-        }
-        .dark .ocr-line {
-            background: rgba(15, 23, 42, 0.6);
-            border-color: rgba(148, 163, 184, 0.14);
-            color: #e2e8f0;
-        }
-        .dark .ocr-line:hover {
-            background: rgba(14, 165, 164, 0.08);
-        }
-        .ocr-line:last-child { margin-bottom: 0; }
-        .ocr-empty { color: #94a3b8; font-size: 13px; font-style: italic; }
-        .ocr-medicine-item {
-            border-radius: 12px;
-            padding: 12px 14px;
-            background: #f0fdfa;
-            border: 1px solid rgba(14, 165, 164, 0.18);
-            margin-bottom: 8px;
-        }
-        .dark .ocr-medicine-item {
-            background: rgba(14, 165, 164, 0.06);
-            border-color: rgba(14, 165, 164, 0.15);
-        }
-        .ocr-medicine-item:last-child { margin-bottom: 0; }
-        .ocr-med-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 12px;
-            margin-bottom: 6px;
-        }
-        .ocr-med-name {
-            font-weight: 600;
-            color: #0f172a;
-            font-size: 14px;
-        }
-        .dark .ocr-med-name {
-            color: #f1f5f9;
-        }
-        .ocr-med-index {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            min-width: 24px;
-            height: 24px;
-            border-radius: 8px;
-            background: #0ea5a4;
-            color: #fff;
-            font-size: 12px;
-            font-weight: 700;
-            margin-right: 8px;
-            flex-shrink: 0;
-        }
-        .ocr-med-qty {
-            font-size: 12px;
-            font-weight: 700;
-            color: #0e7490;
-            background: rgba(14, 165, 164, 0.1);
-            padding: 3px 10px;
-            border-radius: 20px;
-            white-space: nowrap;
-        }
-        .dark .ocr-med-qty {
-            color: #67e8f9;
-            background: rgba(103, 232, 249, 0.1);
-        }
-        .ocr-med-dosage {
-            padding: 5px 10px 5px 16px;
-            font-size: 13px;
-            color: #475569;
-            line-height: 1.5;
-            border-left: 3px solid rgba(14, 165, 164, 0.3);
-            margin-top: 4px;
-        }
-        .dark .ocr-med-dosage {
-            color: #cbd5e1;
-            border-left-color: rgba(14, 165, 164, 0.4);
-        }
-        .ocr-admin-field {
-            display: flex;
-            gap: 6px;
-            padding: 6px 12px;
-            border-radius: 10px;
-            background: #ffffff;
-            border: 1px solid #e2e8f0;
-            margin-bottom: 6px;
-            font-size: 13.5px;
-            line-height: 1.6;
-        }
-        .dark .ocr-admin-field {
-            background: rgba(15, 23, 42, 0.6);
-            border-color: rgba(148, 163, 184, 0.14);
-        }
-        .ocr-admin-label {
-            font-weight: 600;
-            color: #0e7490;
-            white-space: nowrap;
-        }
-        .dark .ocr-admin-label {
-            color: #67e8f9;
-        }
-        .ocr-admin-value {
-            color: #334155;
-        }
-        .dark .ocr-admin-value {
-            color: #e2e8f0;
-        }
-
-        /* Auth Required Modal */
-        .auth-modal-overlay {
-            position: fixed;
-            inset: 0;
-            background: rgba(2, 6, 23, 0.62);
-            backdrop-filter: blur(4px);
-            z-index: 100;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 1rem;
-        }
-        .auth-modal-card {
-            width: min(480px, 100%);
-            border-radius: 22px;
-            background: linear-gradient(145deg, rgba(255,255,255,0.95), rgba(240,253,250,0.92));
-            border: 1px solid rgba(14,165,164,0.32);
-            box-shadow: 0 20px 60px rgba(2,132,199,0.25), 0 0 0 1px rgba(255,255,255,0.65) inset;
-            padding: 24px;
-        }
-        .dark .auth-modal-card {
-            background: linear-gradient(145deg, #1e293b, #0f172a);
-            border-color: rgba(45,212,191,0.45);
-            box-shadow: 0 20px 60px rgba(2,132,199,0.32), 0 0 0 1px rgba(45,212,191,0.2) inset;
-        }
-
-        .delete-modal-card {
-            width: min(460px, 100%);
-            border-radius: 22px;
-            background: linear-gradient(145deg, rgba(255,255,255,0.97), rgba(254,242,242,0.95));
-            border: 1px solid rgba(239,68,68,0.28);
-            box-shadow: 0 20px 60px rgba(220,38,38,0.2), 0 0 0 1px rgba(255,255,255,0.6) inset;
-            padding: 24px;
-        }
-        .dark .delete-modal-card {
-            background: linear-gradient(145deg, #1f2937, #111827);
-            border-color: rgba(248,113,113,0.45);
-            box-shadow: 0 20px 60px rgba(239,68,68,0.22), 0 0 0 1px rgba(248,113,113,0.2) inset;
-        }
-
-        .scan-toast-stack {
-            position: fixed;
-            top: 88px;
-            right: 16px;
-            z-index: 95;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            pointer-events: none;
-            width: min(420px, calc(100vw - 28px));
-        }
-        .scan-toast {
-            border-radius: 14px;
-            padding: 12px 14px;
-            border: 1px solid rgba(148, 163, 184, 0.35);
-            background: rgba(255, 255, 255, 0.95);
-            box-shadow: 0 14px 32px rgba(15, 23, 42, 0.18);
-            backdrop-filter: blur(8px);
-            pointer-events: auto;
-        }
-        .scan-toast.success {
-            border-color: rgba(16, 185, 129, 0.45);
-            box-shadow: 0 14px 32px rgba(5, 150, 105, 0.2);
-        }
-        .scan-toast.error {
-            border-color: rgba(239, 68, 68, 0.45);
-            box-shadow: 0 14px 32px rgba(220, 38, 38, 0.2);
-        }
-        .dark .scan-toast {
-            background: rgba(15, 23, 42, 0.94);
-            border-color: rgba(148, 163, 184, 0.3);
-            box-shadow: 0 14px 32px rgba(2, 132, 199, 0.28);
-        .cropper-view-box,
-        .cropper-face {
-            border-radius: 16px;
-        }
-        .cropper-line,
-        .cropper-point {
-            background-color: #14b8a6;
-        }
-        .cropper-bg {
-            background-image: linear-gradient(45deg, rgba(15, 23, 42, 0.13) 25%, transparent 25%, transparent 75%, rgba(15, 23, 42, 0.13) 75%, rgba(15, 23, 42, 0.13));
-            background-size: 16px 16px;
-        }
-        }
-        .notify-panel {
-            position: absolute;
-            top: calc(100% + 10px);
-            right: 0;
-            width: min(380px, calc(100vw - 24px));
-            border-radius: 16px;
-            border: 1px solid rgba(148, 163, 184, 0.3);
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            box-shadow: 0 22px 44px rgba(15, 23, 42, 0.2);
-            overflow: hidden;
-            z-index: 60;
-        }
-        .dark .notify-panel {
-            background: rgba(15, 23, 42, 0.95);
-            border-color: rgba(148, 163, 184, 0.24);
-            box-shadow: 0 22px 44px rgba(2, 132, 199, 0.24);
-        }
-        .notify-item {
-            border: 1px solid rgba(148, 163, 184, 0.22);
-            border-radius: 12px;
-            padding: 10px 12px;
-            background: rgba(248, 250, 252, 0.92);
-        }
-        .dark .notify-item {
-            border-color: rgba(148, 163, 184, 0.26);
-            background: rgba(30, 41, 59, 0.78);
-        }
-
-        @media (max-width: 640px) {
-        }
-    </style>
+        <link href="/frontend/index.css" rel="stylesheet"/>
 </head>
 
 <body class="bg-gradient-to-br from-slate-50 via-white to-teal-50/30 dark:from-dark-900 dark:via-dark-900 dark:to-slate-900 text-slate-900 dark:text-dark-200 font-body min-h-screen">
@@ -2490,7 +1908,17 @@ function normalizeOcrLine(rawLine) {
         [/\bCan nang\b/gi, 'Cân nặng'],
         [/\bHo ten\b/gi, 'Họ tên'],
         [/\bDia chi\b/gi, 'Địa chỉ'],
-        [/\bDien thoai\b/gi, 'Điện thoại']
+        [/\bDien thoai\b/gi, 'Điện thoại'],
+        [/\bGioi tinh\b/gi, 'Giới tính'],
+        [/\bBenh kem theo\b/gi, 'Bệnh kèm theo'],
+        [/\bLoi dan\b/gi, 'Lời dặn'],
+        [/\bBac si\b/gi, 'Bác sĩ'],
+        [/\bNhip tho\b/gi, 'Nhịp thở'],
+        [/\bTai kham\b/gi, 'Tái khám'],
+        [/\bNgay kham\b/gi, 'Ngày khám'],
+        [/\bTuoi\b/gi, 'Tuổi'],
+        [/\bHuyet ap\b/gi, 'Huyết áp'],
+        [/\bDon thuoc\b/gi, 'Đơn thuốc']
     ];
     replacements.forEach(([pattern, value]) => {
         line = line.replace(pattern, value);
@@ -2498,8 +1926,9 @@ function normalizeOcrLine(rawLine) {
 
     line = line
         // OCR index fixes in medicine block: "S/" -> "5/", "6G" -> "6/"
+        // Only uppercase G (OCR misread of /); lowercase g is the gram unit.
         .replace(/(^|\s)[Ss]\s*\/(?=\s*[A-Za-zÀ-ỹ])/g, '$15/ ')
-        .replace(/(^|\s)(\d{1,2})\s*[Gg](?=\s+[A-Za-zÀ-ỹ])/g, '$1$2/')
+        .replace(/(^|\s)(\d{1,2})\s*G(?=\s+[A-Za-zÀ-ỹ])/g, '$1$2/')
         .replace(/\s*:\s*/g, ': ')
         .replace(/\s*;\s*/g, '; ')
         .replace(/\s*,\s*/g, ', ')
@@ -2517,10 +1946,17 @@ function normalizeOcrLine(rawLine) {
 }
 
 function splitByMedicalFields(line) {
-    const withBreaks = line.replace(
-        /\s+(?=(Họ tên|NS|Ns|Địa chỉ|Điện thoại|Sinh hiệu|Thân nhiệt|Huyết áp|Cân nặng|Chẩn đoán|Chuẩn đoán|Điều trị|Bệnh kèm theo)\s*:)/gi,
-        '\n'
-    );
+    const withBreaks = line
+        .replace(
+            /\s+(?=(Họ tên|NS|Ns|Tuổi|Giới tính|Địa chỉ|Điện thoại|Sinh hiệu|Thân nhiệt|Huyết áp|Mạch|Nhịp thở|Cân nặng|Chẩn đoán|Chuẩn đoán|Bệnh kèm theo|Điều trị|Liều|Lời dặn|Tái khám|Bác sĩ|Ngày khám|Ngày tái khám)\s*:)/gi,
+            '\n'
+        )
+        // Split embedded medicine indices: "... Chiều 13/Peri ...".
+        // Use [/.)], NOT [-] or [Gg], to avoid splitting ICD codes (J06 - ...) or dosage (5g).
+        .replace(/\s+(?=(?:\d{1,2}|[Ss])\s*[\/\.)]\s*[A-Za-zÀ-ỹ])/g, '\n')
+        // Zero-width split for OCR-glued text. Only after digits/punctuation, never after letters.
+        // (?<!\n\d) prevents re-splitting numbers already at line start.
+        .replace(/(?<!\n)(?<!\n\d)(?<=[0-9;,\)])(?=(?:\d{1,2}|[Ss])\s*[\/\.)]\s*[A-Za-zÀ-ỹ])/g, '\n');
     return withBreaks.split('\n').map((part) => part.trim()).filter(Boolean);
 }
 
@@ -2558,7 +1994,7 @@ function buildCompactInfoBody(patientInfoRows) {
 }
 
 function tryParseMedicineRow(line) {
-    const match = line.match(/^((?:\d+)|(?:[Ss]))\s*(?:[\/\.\-)]+|[Gg])\s*(.+)$/);
+    const match = line.match(/^((?:\d+)|(?:[Ss]))\s*[\/\.)]+\s*(.+)$/);
     if (!match) return null;
 
     // Only treat as medicine index if number is reasonable (1-50)
@@ -2665,7 +2101,7 @@ function formatOcrTextForDisplay(rawText) {
 
     if (lines.length === 0) return '';
 
-    const fieldPattern = /^(Họ tên|Ho ten|Hoten|Địa chỉ|Dia chi|Sinh hiệu|Than nhiệt|Thân nhiệt|Huyết áp|Cân nặng|Chẩn đoán|Chuẩn đoán|Điều trị|Bệnh kèm theo|Ngày|Bác sĩ|STT|Sáng|Trưa|Chiều|Tối|Uống|Thoa|Bôi)\b/i;
+    const fieldPattern = /^(Họ tên|Ho ten|Hoten|Tuổi|Giới tính|Địa chỉ|Dia chi|Điện thoại|Sinh hiệu|Than nhiệt|Thân nhiệt|Huyết áp|Mạch|Nhịp thở|Cân nặng|Chẩn đoán|Chuẩn đoán|Bệnh kèm theo|Điều trị|Liều|Lời dặn|Tái khám|Bác sĩ|Ngày khám|Ngày tái khám|Ngày|STT|Sáng|Trưa|Chiều|Tối|Uống|Thoa|Bôi)\b/i;
     const itemPattern = /^\d+\s*[\/.\-)]+\s*/;
     const allCapsPattern = /^[A-ZÀ-Ỵ0-9\s:()\-]{6,}$/;
 
@@ -2682,6 +2118,22 @@ function formatOcrTextForDisplay(rawText) {
 
     const structuredRows = structurePrescriptionRows(rows);
     return structuredRows.join('\n');
+}
+
+function foldVietnameseText(text) {
+    return (text || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase();
+}
+
+function isNameFieldLike(line) {
+    const folded = foldVietnameseText(line);
+    const compact = folded.replace(/[^a-z0-9]/g, '');
+    return /(^|\b)ho\s*ten\b/.test(folded)
+        || /ten\s*benh\s*nhan/.test(folded)
+        || compact.includes('hoten')
+        || compact.includes('tenbenhnhan');
 }
 
 function extractOcrSectionsForView(formattedText) {
@@ -2711,15 +2163,27 @@ function extractOcrSectionsForView(formattedText) {
             .replace(/\bhuyet ap\b/gi, 'Huyết áp')
             .replace(/\bdia chi\b/gi, 'Địa chỉ')
             .replace(/\bdien thoai\b/gi, 'Điện thoại')
+            .replace(/\bgioi tinh\b/gi, 'Giới tính')
+            .replace(/\bbenh kem theo\b/gi, 'Bệnh kèm theo')
+            .replace(/\bloi dan\b/gi, 'Lời dặn')
+            .replace(/\bbac si\b/gi, 'Bác sĩ')
+            .replace(/\bmach\b\s*:?/gi, 'Mạch:')
+            .replace(/\bnhip tho\b/gi, 'Nhịp thở')
+            .replace(/\btai kham\b/gi, 'Tái khám')
+            .replace(/\bngay kham\b/gi, 'Ngày khám')
+            .replace(/\btuoi\b/gi, 'Tuổi')
+            .replace(/\bchan doan\b/gi, 'Chẩn đoán')
+            .replace(/\bdieu tri\b/gi, 'Điều trị')
+            .replace(/\bdon thuoc\b/gi, 'Đơn thuốc')
             .replace(/\s{2,}/g, ' ')
             .trim();
     };
 
     const splitMixedFields = (line) => {
         const prepared = normalizeViewLine(line)
-            .replace(/\s+(?=(Họ tên|Giới tính|Địa chỉ|Điện thoại|NS|Năm sinh|Sinh hiệu|Thân nhiệt|Huyết áp|Cân nặng|Chẩn đoán|Chuẩn đoán|Điều trị)\s*:?)/gi, '\n')
+            .replace(/\s+(?=(Họ tên|Giới tính|Địa chỉ|Điện thoại|NS|Năm sinh|Sinh hiệu|Thân nhiệt|Huyết áp|Mạch|Nhịp thở|Cân nặng|Chẩn đoán|Chuẩn đoán|Bệnh kèm theo|Điều trị|Lời dặn|Tái khám|Bác sĩ|Ngày khám|Ngày tái khám|Liều)\s*:?)/gi, '\n')
             .replace(/\s+(?=(Tuổi)\s*[:\-])/gi, '\n')
-            .replace(/\s+(?=(\d+\s*[\/\.)\-]))/g, '\n');
+            .replace(/\s+(?=(\d+\s*[\/\.)]))/g, '\n');
         return prepared.split('\n').map((x) => x.trim()).filter(Boolean);
     };
 
@@ -2734,7 +2198,7 @@ function extractOcrSectionsForView(formattedText) {
         // Prevent medicine block from being glued into admin fields.
         value = value
             .replace(/\s+(?=Danh mục thuốc\s*:|STT\b).*/i, '')
-            .replace(/\s+(?=(?:\d{1,2}|[Ss])\s*(?:[\/\.)\-]|[Gg])\s*[A-Za-zÀ-ỹ]).*/i, '')
+            .replace(/\s+(?=(?:\d{1,2}|[Ss])\s*[\/\.)]\s*[A-Za-zÀ-ỹ]).*/i, '')
             .trim();
 
         if (!value) return;
@@ -2742,16 +2206,16 @@ function extractOcrSectionsForView(formattedText) {
     };
 
     // OCR thường dính nhiều trường trên một dòng, cần tách cưỡng bức theo toàn văn.
-    pushAdminFieldFromWholeText('Họ tên', /(?:họ\s*tên|ho\s*ten|h[oọ]\s*t[eê]n|tên\s*bệnh\s*nhân)\s*[:\-]?\s*([^:;]+?)(?=\s+(?:NS|Năm\s*sinh|Giới\s*tính|Địa\s*chỉ|Điện\s*thoại|Sinh\s*hiệu|Thân\s*nhiệt|Huyết\s*áp|Cân\s*nặng|Chẩn\s*đoán|Điều\s*trị|Danh\s*mục\s*thuốc|STT)\s*:?|\s+Tuổi\s*[:\-]|\s+(?:(?:\d{1,2}|[Ss])\s*(?:[\/\.)\-]|[Gg]))|$)/i);
-    pushAdminFieldFromWholeText('NS', /(?:\bNS\b|Năm\s*sinh)\s*[:\-]?\s*(.+?)(?=\s+(?:Giới\s*tính|Địa\s*chỉ|Điện\s*thoại|Sinh\s*hiệu|Thân\s*nhiệt|Huyết\s*áp|Cân\s*nặng|Chẩn\s*đoán|Điều\s*trị|Danh\s*mục\s*thuốc|STT)\s*:?|\s+Tuổi\s*[:\-]|\s+(?:(?:\d{1,2}|[Ss])\s*(?:[\/\.)\-]|[Gg]))|$)/i);
-    pushAdminFieldFromWholeText('Cân nặng', /(?:Cân\s*nặng)\s*:?\s*(.+?)(?=\s+(?:Sinh\s*hiệu|Thân\s*nhiệt|Huyết\s*áp|Chẩn\s*đoán|Điều\s*trị|Bệnh\s*kèm\s*theo|Danh\s*mục\s*thuốc|STT)\s*:?|\s+(?:(?:\d{1,2}|[Ss])\s*(?:[\/\.)\-]|[Gg]))|$)/i);
-    pushAdminFieldFromWholeText('Địa chỉ', /(?:Địa\s*chỉ)\s*:?\s*(.+?)(?=\s+(?:Điện\s*thoại|Sinh\s*hiệu|Thân\s*nhiệt|Huyết\s*áp|Chẩn\s*đoán|Điều\s*trị|Danh\s*mục\s*thuốc|STT)\s*:?|\s+(?:(?:\d{1,2}|[Ss])\s*(?:[\/\.)\-]|[Gg]))|$)/i);
-    pushAdminFieldFromWholeText('Điện thoại', /(?:Điện\s*thoại)\s*:?\s*(.+?)(?=\s+(?:Sinh\s*hiệu|Thân\s*nhiệt|Huyết\s*áp|Chẩn\s*đoán|Điều\s*trị|Danh\s*mục\s*thuốc|STT)\s*:?|\s+(?:(?:\d{1,2}|[Ss])\s*(?:[\/\.)\-]|[Gg]))|$)/i);
+    pushAdminFieldFromWholeText('Họ tên', /(?:họ\s*tên|ho\s*ten|h[oọ]\s*t[eê]n|tên\s*bệnh\s*nhân)\s*[:\-]?\s*([^:;]+?)(?=\s+(?:NS|Năm\s*sinh|Giới\s*tính|Địa\s*chỉ|Điện\s*thoại|Sinh\s*hiệu|Thân\s*nhiệt|Huyết\s*áp|Cân\s*nặng|Chẩn\s*đoán|Điều\s*trị|Danh\s*mục\s*thuốc|STT)\s*:?|\s+Tuổi\s*[:\-]|\s+(?:(?:\d{1,2}|[Ss])\s*[\/\.)]\s*[A-Za-zÀ-ỹ])|$)/i);
+    pushAdminFieldFromWholeText('NS', /(?:\bNS\b|Năm\s*sinh)\s*[:\-]?\s*(.+?)(?=\s+(?:Giới\s*tính|Địa\s*chỉ|Điện\s*thoại|Sinh\s*hiệu|Thân\s*nhiệt|Huyết\s*áp|Cân\s*nặng|Chẩn\s*đoán|Điều\s*trị|Danh\s*mục\s*thuốc|STT)\s*:?|\s+Tuổi\s*[:\-]|\s+(?:(?:\d{1,2}|[Ss])\s*[\/\.)]\s*[A-Za-zÀ-ỹ])|$)/i);
+    pushAdminFieldFromWholeText('Cân nặng', /(?:Cân\s*nặng)\s*:?\s*(.+?)(?=\s+(?:Sinh\s*hiệu|Thân\s*nhiệt|Huyết\s*áp|Chẩn\s*đoán|Điều\s*trị|Bệnh\s*kèm\s*theo|Danh\s*mục\s*thuốc|STT)\s*:?|\s+(?:(?:\d{1,2}|[Ss])\s*[\/\.)]\s*[A-Za-zÀ-ỹ])|$)/i);
+    pushAdminFieldFromWholeText('Địa chỉ', /(?:Địa\s*chỉ)\s*:?\s*(.+?)(?=\s+(?:Điện\s*thoại|Sinh\s*hiệu|Thân\s*nhiệt|Huyết\s*áp|Chẩn\s*đoán|Điều\s*trị|Danh\s*mục\s*thuốc|STT)\s*:?|\s+(?:(?:\d{1,2}|[Ss])\s*[\/\.)]\s*[A-Za-zÀ-ỹ])|$)/i);
+    pushAdminFieldFromWholeText('Điện thoại', /(?:Điện\s*thoại)\s*:?\s*(.+?)(?=\s+(?:Sinh\s*hiệu|Thân\s*nhiệt|Huyết\s*áp|Chẩn\s*đoán|Điều\s*trị|Danh\s*mục\s*thuốc|STT)\s*:?|\s+(?:(?:\d{1,2}|[Ss])\s*[\/\.)]\s*[A-Za-zÀ-ỹ])|$)/i);
 
     let inMedicine = false;
     for (const line of expandedLines) {
         const normalized = line.toLowerCase();
-        const medicineIndexPattern = /^(\d{1,2}\s*[\/\.)\-]|stt\b)/i;
+        const medicineIndexPattern = /^(\d{1,2}\s*[\/\.)]|stt\b)/i;
 
         // Skip lines starting with large numbers (400., 500.) - these are dosage info, not medicine indices
         const isMedicineIndex = (ln) => {
@@ -2765,6 +2229,7 @@ function extractOcrSectionsForView(formattedText) {
             const matchName = line.match(/(?:họ\s*tên|ho\s*ten|h[oọ]\s*t[eê]n|tên\s*bệnh\s*nhân)\s*[:\-]?\s*(.+?)(?=\s+(?:NS|Năm\s*sinh|Tuổi|Giới\s*tính|Địa\s*chỉ|Điện\s*thoại|Sinh\s*hiệu|Thân\s*nhiệt|Huyết\s*áp|Cân\s*nặng|Chẩn\s*đoán|Điều\s*trị)\s*:?|$)/i);
             if (matchName && matchName[1]) {
                 sections.admin.push(`Họ tên: ${matchName[1].trim()}`);
+                continue;
             }
         }
 
@@ -2778,6 +2243,7 @@ function extractOcrSectionsForView(formattedText) {
             continue;
         }
         if (/^(Họ tên|Tuổi|Giới tính|Địa chỉ|Điện thoại|NS|Năm sinh|Cân nặng)\s*:?/i.test(line)
+            || isNameFieldLike(line)
             || /(trung tam y te|trung tâm y tế|bệnh viện|benh vien|mã y|so ho so|số hồ sơ|bhyt|tên bệnh nhân|đối tượng)/i.test(normalized)) {
             sections.admin.push(line);
             continue;
@@ -2822,7 +2288,7 @@ function extractOcrSectionsForView(formattedText) {
     sections.instructions = uniq(sections.instructions);
     sections.other = uniq(sections.other).filter((line) => !sections.instructions.includes(line));
 
-    const nameLikePattern = /(h[oọóòôơ]?\s*t[eêéè]n|ho\s*ten|hoten|hótén|tên\s*bệnh\s*nhân)/i;
+    const nameLikePattern = /(h[oọóòôơ]?\s*t[eêéè]n|ho\s*ten|hoten|hótén|tên\s*bệnh\s*nhân|ten\s*benh\s*nhan)/i;
     const normalizeNameLine = (line) => {
         const raw = (line || '').trim();
         const match = raw.match(/(?:h[oọóòôơ]?\s*t[eêéè]n|ho\s*ten|hoten|hótén|tên\s*bệnh\s*nhân)\s*[:\-]?\s*(.+)$/i);
@@ -2834,12 +2300,12 @@ function extractOcrSectionsForView(formattedText) {
     };
 
     const rescuedNameLines = sections.other
-        .filter((line) => nameLikePattern.test(line))
+        .filter((line) => nameLikePattern.test(line) || isNameFieldLike(line))
         .map((line) => normalizeNameLine(line))
         .filter(Boolean);
     if (rescuedNameLines.length > 0) {
         sections.admin = uniq([...sections.admin, ...rescuedNameLines]);
-        sections.other = sections.other.filter((line) => !nameLikePattern.test(line));
+        sections.other = sections.other.filter((line) => !nameLikePattern.test(line) && !isNameFieldLike(line));
     }
 
     const adminOrder = ['Họ tên', 'NS', 'Năm sinh', 'Tuổi', 'Giới tính', 'Cân nặng', 'Địa chỉ', 'Điện thoại'];
@@ -2908,12 +2374,15 @@ function parseMedicineGuideItems(formattedText) {
 
     const splitEmbeddedMedicineLines = (line) => {
         // Split when a new medicine index is embedded in the middle of a line.
-        // Handles common OCR mistakes: "S/" (for 5/) and "6G" (for 6/).
+        // Use [/.)], NOT [-] or [Gg], to avoid splitting ICD codes or dosage units.
         const normalized = normalizeOcrLine(line)
-            .replace(/\s+(?=((?:\d{1,2}|[Ss])\s*(?:[\/\.)\-])\s*[A-Za-zÀ-ỹ]))/g, '\n')
-            .replace(/\s+(?=(\d{1,2}\s*[Gg]\s+[A-Za-zÀ-ỹ]))/g, '\n')
-            // Handle embedded index without separator: "... 1/2 6 LysinKid 45 Chai ..."
-            .replace(/\s+(?=(\d{1,2}\s+[A-ZÀ-Ỵ][A-Za-zÀ-ỹ0-9]{2,}[^\n]*\b(?:Viên|Vien|Ống|Ong|Chai|Tuýp|Tuyp|Gói|Goi|Giọt|Giot|mg|ml|UI)\b))/g, '\n');
+            .replace(/\s+(?=(?:\d{1,2}|[Ss])\s*[\/\.)]+\s*[A-Za-zÀ-ỹ])/g, '\n')
+            // Handle embedded no-separator indices like "... Chiều 1 2 PRED Smg 06 Viên ..."
+            // but only when a valid package quantity appears ahead to avoid splitting dosage tokens.
+            .replace(/\s+(?=((?:\d{1,2}|[Ss])\s+[A-Za-zÀ-ỹ][A-Za-zÀ-ỹ0-9()\-]{2,}(?:\s+[A-Za-zÀ-ỹ0-9()\-]{1,}){0,5}\s+\d{1,3}\s*(?:Viên|Vien|Viện|Vién|Ống|Ong|Chai|Tuýp|Tuyp|Túyp|Typ|Tube|Gói|Goi|Giọt|Giot|Vỉ|Vi)))/gi, '\n')
+            // Split before un-numbered medicine name + quantity patterns
+            // e.g. "Sáng 1; Chiều 1 Forte 06 Tuyp" -> split before "Forte"
+            .replace(/(?<=\d)\s+(?=(?!(?:Sáng|Sang|Trưa|Trua|Chiều|Chieu|Tối|Toi|Uống|Uong|Thoa|Bôi|Boi|Liều|Ngày|Ngay)\b)[A-Za-zÀ-ỹ]{3,}(?:\s+[A-Za-zÀ-ỹ]{1,}){0,3}\s+\d{1,3}\s*(?:Viên|Vien|Viện|Vién|Ống|Ong|Chai|Tuýp|Tuyp|Túyp|Typ|Tube|Gói|Goi|Giọt|Giot|Vỉ|Vi)\b)/gi, '\n');
         return normalized.split('\n').map((x) => x.trim()).filter(Boolean);
     };
 
@@ -2922,7 +2391,7 @@ function parseMedicineGuideItems(formattedText) {
     const items = [];
     let currentItem = null;
 
-    const medPattern = /^((?:\d+)|(?:[Ss]))\s*(?:[\/\.)\-]+|[Gg])\s*(.+)$/i;
+    const medPattern = /^((?:\d+)|(?:[Ss]))\s*[\/\.)]+\s*(.+)$/i;
     const quantityTailPattern = /(\d+\s*(Viên|Vien|Viện|Vién|Ống|Ong|Chai|Tuýp|Tuyp|Túyp|Typ|Tube|Gói|Goi|ml|mg|UI|Giọt|Giot|Vỉ|Vi)|(Viên|Vien|Viện|Vién|Ống|Ong|Chai|Tuýp|Tuyp|Túyp|Typ|Tube|Gói|Goi|Giọt|Giot|Vỉ|Vi)\s*\d+)\s*[).,;:]*$/i;
     const packageQuantityInlinePattern = /(\d{1,3}\s*(Viên|Vien|Viện|Vién|Ống|Ong|Chai|Tuýp|Tuyp|Túyp|Typ|Tube|Gói|Goi|Giọt|Giot|Vỉ|Vi)|(Viên|Vien|Viện|Vién|Ống|Ong|Chai|Tuýp|Tuyp|Túyp|Typ|Tube|Gói|Goi|Giọt|Giot|Vỉ|Vi)\s*\d{1,3})/i;
 
@@ -2963,6 +2432,33 @@ function parseMedicineGuideItems(formattedText) {
             .trim();
 
         return { quantity, stripped };
+    };
+
+    const extractInlineQuantityAnyPosition = (text) => {
+        const source = (text || '').trim();
+        if (!source) return { quantity: '', stripped: source };
+
+        const matches = [...source.matchAll(new RegExp(packageQuantityInlinePattern.source, 'gi'))];
+        if (matches.length === 0) {
+            return { quantity: '', stripped: source };
+        }
+
+        // Prefer package count units (vien/ong/chai/tuyp/goi/giot/vi) over mg/ml/ui.
+        const packageUnitRegex = /(viên|vien|viện|vién|ống|ong|chai|tuýp|tuyp|túyp|typ|tube|gói|goi|giọt|giot|vỉ|vi)/i;
+        let preferred = matches.filter((x) => packageUnitRegex.test(x[0] || ''));
+        if (preferred.length === 0) preferred = matches;
+
+        // Then prefer the right-most token because embedded next medicine
+        // often appears after dosage text: "... Sf Peri 03 Viên Sáng 1/2".
+        const picked = preferred[preferred.length - 1];
+        const matchedText = (picked[0] || '').trim();
+        const start = picked.index ?? source.toLowerCase().lastIndexOf(matchedText.toLowerCase());
+        if (start < 0 || !matchedText) {
+            return { quantity: '', stripped: source };
+        }
+        const end = start + matchedText.length;
+        const stripped = `${source.slice(0, start)} ${source.slice(end)}`.replace(/\s{2,}/g, ' ').trim();
+        return { quantity: matchedText, stripped };
     };
 
     const cleanMedicineName = (text) => {
@@ -3033,10 +2529,14 @@ function parseMedicineGuideItems(formattedText) {
 
     const noSeparatorMedPattern = /^(\d{1,2})\s+(.+)$/;
     const looksLikeStandaloneMedicine = (indexText, nameText) => {
+        if (/^0\d+$/.test((indexText || '').trim())) return false;
         const idx = parseInt(indexText, 10);
         if (Number.isNaN(idx) || idx <= 0 || idx > 50) return false;
         const name = (nameText || '').trim();
         if (!name) return false;
+        if (/^(Viên|Vien|Viện|Vién|Ống|Ong|Chai|Tuýp|Tuyp|Túyp|Typ|Tube|Gói|Goi|Giọt|Giot|Vỉ|Vi)\b/i.test(name)) {
+            return false;
+        }
         if (/^(Sáng|Sang|Trưa|Trua|Chiều|Chieu|Tối|Toi|Uống|Uong|Thoa|Bôi|Boi|Ngày|Ngay)\b/i.test(name)) {
             return false;
         }
@@ -3047,6 +2547,181 @@ function parseMedicineGuideItems(formattedText) {
         const normalized = (line || '').toLowerCase();
         return /(sáng|trưa|chiều|tối|uống|thoa|bôi|liều|ngày|lần|\/) /i.test(`${line} `)
             || (/^(sáng|trưa|chiều|tối|uống|thoa|bôi|liều|ghi chú|-)\b/i.test(line) && /\d|\/|nửa|1\/2/i.test(normalized));
+    };
+
+    const appendDoseToItem = (targetItem, rawDoseLine) => {
+        if (!targetItem) return;
+        let dosageLine = cleanDosageText(rawDoseLine || '');
+        if (!dosageLine) return;
+
+        if (!targetItem.quantity) {
+            const extractedDose = extractQuantityFromLine(dosageLine);
+            if (extractedDose.quantity) {
+                targetItem.quantity = extractedDose.quantity;
+                dosageLine = cleanDosageText(extractedDose.stripped);
+            } else {
+                const inlineExtractedDose = extractInlineQuantityAnyPosition(dosageLine);
+                if (inlineExtractedDose.quantity) {
+                    targetItem.quantity = inlineExtractedDose.quantity;
+                    dosageLine = cleanDosageText(inlineExtractedDose.stripped);
+                }
+            }
+        }
+
+        if (dosageLine) {
+            targetItem.dosage.push(dosageLine);
+        }
+    };
+
+    const trySplitEmbeddedMedicineFromDoseLine = (line) => {
+        const source = cleanDosageText(line || '');
+        if (!source) return null;
+
+        // Targeted fix for OCR chain like:
+        // "... Thoa da 2 Bin/ngày % / Pest 03 Viên Sáng 1/2; Chiều 1/2"
+        // Keep dose before marker on current item, split the medicine after marker.
+        const markerSeparatedMatch = source.match(
+            /^(.*?)(?:%\s*\/?|\/\s*%?)\s*([A-Za-zÀ-ỹ][A-Za-zÀ-ỹ0-9()\-]{2,}(?:\s+[A-Za-zÀ-ỹ0-9()\-]{1,}){0,4})\s+(\d{1,3}\s*(?:Viên|Vien|Viện|Vién|Ống|Ong|Chai|Tuýp|Tuyp|Túyp|Typ|Tube|Gói|Goi|Giọt|Giot|Vỉ|Vi|ml|mg|UI))\b\s*(.*)$/i
+        );
+        if (markerSeparatedMatch) {
+            const dosePart = cleanDosageText((markerSeparatedMatch[1] || '').replace(/[%;/\\]+\s*$/g, ''));
+            const medName = cleanMedicineName(markerSeparatedMatch[2] || '');
+            const medQty = (markerSeparatedMatch[3] || '').replace(/\s{2,}/g, ' ').trim();
+            const medDose = cleanDosageText(markerSeparatedMatch[4] || '');
+
+            if (medQty && looksLikeMedicineName(medName)) {
+                return {
+                    dosePart,
+                    newMedicine: {
+                        name: medName,
+                        quantity: medQty,
+                        dosage: medDose ? [medDose] : []
+                    }
+                };
+            }
+        }
+
+        const leadingMedicinePattern = new RegExp(
+            '^([A-Za-zÀ-ỹ][A-Za-zÀ-ỹ0-9()\\-]{2,}(?:\\s+[A-Za-zÀ-ỹ0-9()\\-]{1,}){0,5})\\s+(\\d{1,3}\\s*(?:Viên|Vien|Viện|Vién|Ống|Ong|Chai|Tuýp|Tuyp|Túyp|Typ|Tube|Gói|Goi|Giọt|Giot|Vỉ|Vi|ml|mg|UI))\\b',
+            'i'
+        );
+        const leadingMed = source.match(leadingMedicinePattern);
+        if (leadingMed && leadingMed[1] && leadingMed[2]) {
+            const leadingName = cleanMedicineName(leadingMed[1]);
+            if (looksLikeMedicineName(leadingName)) {
+                const remainderDose = cleanDosageText(source.slice(leadingMed[0].length));
+                return {
+                    dosePart: '',
+                    newMedicine: {
+                        name: leadingName,
+                        quantity: leadingMed[2].replace(/\s{2,}/g, ' ').trim(),
+                        dosage: remainderDose ? [remainderDose] : []
+                    }
+                };
+            }
+        }
+
+        const quantityMatches = [];
+        const qtyRegex = new RegExp(packageQuantityInlinePattern.source, 'gi');
+        let m;
+        while ((m = qtyRegex.exec(source)) !== null) {
+            const token = (m[0] || '').trim();
+            if (!token) continue;
+            quantityMatches.push({
+                index: m.index,
+                text: token
+            });
+        }
+        if (quantityMatches.length === 0) return null;
+
+        const dosageKwSet = new Set(['sáng', 'sang', 'trưa', 'trua', 'chiều', 'chieu', 'tối', 'toi', 'uống', 'uong', 'thoa', 'bôi', 'boi', 'liều', 'ngày', 'ngay']);
+
+        for (let qi = quantityMatches.length - 1; qi >= 0; qi -= 1) {
+            const qtyMatch = quantityMatches[qi];
+            const qtyIndex = qtyMatch.index;
+            if (qtyIndex <= 0) continue;
+
+            const beforeQty = source.slice(0, qtyIndex).trim();
+            const afterQty = source.slice(qtyIndex).trim();
+            if (!beforeQty || !afterQty) continue;
+
+            const tokens = beforeQty.split(/\s+/).filter(Boolean);
+            if (tokens.length === 0) continue;
+            const beforeHasDosageCue = /\b(sáng|sang|trưa|trua|chiều|chieu|tối|toi|uống|uong|thoa|bôi|boi|liều|ngày|ngay|lần)\b/i.test(beforeQty);
+
+            let nameStart = -1;
+            for (let i = tokens.length - 1; i >= 0; i -= 1) {
+                const token = tokens[i].replace(/[;,.:]+$/g, '');
+                if (!token) continue;
+                if (dosageKwSet.has(token.toLowerCase())) continue;
+                if (/^[A-ZÀ-Ỵ][A-Za-zÀ-ỹ0-9()\-]{2,}$/.test(token)) {
+                    nameStart = i;
+                    break;
+                }
+
+                // OCR can lowercase medicine names (e.g. "forte 06 Tuyp").
+                // If the left side looks like dosage and the tail has quantity-unit,
+                // treat this token as the start of a new medicine.
+                const tokenLooksLikeMedWord = /^[A-Za-zÀ-ỹ][A-Za-zÀ-ỹ0-9()\-]{3,}$/.test(token);
+                if (beforeHasDosageCue && tokenLooksLikeMedWord) {
+                    const candidateTail = tokens.slice(i).join(' ').trim();
+                    if (packageQuantityInlinePattern.test(candidateTail)) {
+                        nameStart = i;
+                        break;
+                    }
+                }
+            }
+
+            if (nameStart === -1) continue;
+
+            let medStart = nameStart;
+            // Expand left for split medicine names like "Sf Peri", "Acid Folic".
+            while (medStart > 0) {
+                const prevTokenRaw = (tokens[medStart - 1] || '').replace(/[;,.:]+$/g, '');
+                if (!prevTokenRaw) break;
+                const prevLower = prevTokenRaw.toLowerCase();
+                if (dosageKwSet.has(prevLower)) break;
+
+                const isPrevTitleWord = /^[A-ZÀ-Ỵ][A-Za-zÀ-ỹ0-9()\-]{1,}$/.test(prevTokenRaw);
+                const isPrevShortPrefix = /^[A-Za-zÀ-ỹ]{1,3}$/.test(prevTokenRaw) && /^[A-ZÀ-Ỵ]/.test(tokens[medStart] || '');
+                if (!isPrevTitleWord && !isPrevShortPrefix) break;
+
+                medStart -= 1;
+            }
+
+            let dosePart = tokens.slice(0, medStart).join(' ').trim();
+            // Remove OCR residue such as trailing standalone "S" before next medicine.
+            dosePart = dosePart.replace(/\b[A-ZÀ-Ỵ]{1,2}\s*$/g, '').trim();
+
+            const medPart = `${tokens.slice(medStart).join(' ')} ${afterQty}`.trim();
+            if (!medPart) continue;
+
+            let medNamePart = medPart;
+            let medInlineDosage = '';
+            const dosageKw = medPart.match(/\b(Sáng|Sang|Trưa|Trua|Chiều|Chieu|Tối|Toi|Uống|Uong|Thoa|Bôi|Boi|Ngày|Ngay)\b/i);
+            if (dosageKw) {
+                medInlineDosage = medPart.slice(dosageKw.index).trim();
+                medNamePart = medPart.slice(0, dosageKw.index).trim();
+            }
+
+            const extracted = extractQuantityFromLine(medNamePart);
+            const quantity = extracted.quantity || '';
+            const name = cleanMedicineName(extracted.stripped || medNamePart);
+            medInlineDosage = cleanDosageText(medInlineDosage);
+
+            if (!quantity || !looksLikeMedicineName(name)) continue;
+
+            return {
+                dosePart,
+                newMedicine: {
+                    name,
+                    quantity,
+                    dosage: medInlineDosage ? [medInlineDosage] : []
+                }
+            };
+        }
+
+        return null;
     };
 
     for (const rawLine of lines) {
@@ -3079,6 +2754,22 @@ function parseMedicineGuideItems(formattedText) {
             }
 
             const rawCandidate = (medRemainder || medMatch[2] || '').trim();
+            const startsWithUnitOnly = /^(Viên|Vien|Viện|Vién|Ống|Ong|Chai|Tuýp|Tuyp|Túyp|Typ|Tube|Gói|Goi|Giọt|Giot|Vỉ|Vi)\b/i.test(rawCandidate);
+            if (currentItem && startsWithUnitOnly) {
+                let dosageLine = cleanDosageText(rawCandidate);
+                if (!currentItem.quantity) {
+                    const extractedDose = extractQuantityFromLine(dosageLine);
+                    if (extractedDose.quantity) {
+                        currentItem.quantity = extractedDose.quantity;
+                        dosageLine = cleanDosageText(extractedDose.stripped);
+                    }
+                }
+                if (dosageLine) {
+                    currentItem.dosage.push(dosageLine);
+                }
+                continue;
+            }
+
             if (currentItem && looksLikeDosageFragment(rawCandidate)) {
                 let dosageLine = cleanDosageText(rawCandidate);
                 if (!currentItem.quantity) {
@@ -3113,6 +2804,12 @@ function parseMedicineGuideItems(formattedText) {
                 if (extracted.quantity) {
                     quantityPart = extracted.quantity;
                     namePart = extracted.stripped;
+                } else {
+                    const inlineQtyFromName = extractInlineQuantityAnyPosition(namePart);
+                    if (inlineQtyFromName.quantity) {
+                        quantityPart = inlineQtyFromName.quantity;
+                        namePart = inlineQtyFromName.stripped;
+                    }
                 }
 
                 if (inlineDosagePart && !quantityPart) {
@@ -3120,6 +2817,12 @@ function parseMedicineGuideItems(formattedText) {
                     if (extractedInlineDose.quantity) {
                         quantityPart = extractedInlineDose.quantity;
                         inlineDosagePart = extractedInlineDose.stripped;
+                    } else {
+                        const inlineAnyQty = extractInlineQuantityAnyPosition(inlineDosagePart);
+                        if (inlineAnyQty.quantity) {
+                            quantityPart = inlineAnyQty.quantity;
+                            inlineDosagePart = inlineAnyQty.stripped;
+                        }
                     }
                 }
             }
@@ -3157,20 +2860,36 @@ function parseMedicineGuideItems(formattedText) {
         if (!currentItem) continue;
 
         if (looksLikeDosage(line)) {
-            let dosageLine = line.replace(/^-\s*/, '').trim();
+            const initialDose = line.replace(/^-\s*/, '').trim();
+            const segmentQueue = [initialDose];
 
-            // Recover quantity if OCR put quantity in dosage line, e.g. "uống sau ăn) 06 Viên"
-            if (!currentItem.quantity) {
-                const extractedDose = extractQuantityFromLine(dosageLine);
-                if (extractedDose.quantity) {
-                    currentItem.quantity = extractedDose.quantity;
-                    dosageLine = extractedDose.stripped;
+            while (segmentQueue.length > 0) {
+                const segment = cleanDosageText(segmentQueue.shift() || '');
+                if (!segment) continue;
+
+                const embeddedSplit = trySplitEmbeddedMedicineFromDoseLine(segment);
+                if (!embeddedSplit || !embeddedSplit.newMedicine) {
+                    appendDoseToItem(currentItem, segment);
+                    continue;
+                }
+
+                appendDoseToItem(currentItem, embeddedSplit.dosePart || '');
+
+                const nextItem = {
+                    index: String(items.length + 1),
+                    name: embeddedSplit.newMedicine.name,
+                    quantity: embeddedSplit.newMedicine.quantity,
+                    dosage: []
+                };
+                items.push(nextItem);
+                currentItem = nextItem;
+
+                const nestedSeed = cleanDosageText((embeddedSplit.newMedicine.dosage || [])[0] || '');
+                if (nestedSeed) {
+                    segmentQueue.unshift(nestedSeed);
                 }
             }
 
-            if (dosageLine) {
-                currentItem.dosage.push(dosageLine);
-            }
             continue;
         }
 
@@ -3180,6 +2899,15 @@ function parseMedicineGuideItems(formattedText) {
                 currentItem.quantity = extractedFromTail.quantity;
                 if (extractedFromTail.stripped) {
                     currentItem.dosage.push(extractedFromTail.stripped);
+                }
+                continue;
+            }
+
+            const inlineExtractedTail = extractInlineQuantityAnyPosition(line);
+            if (inlineExtractedTail.quantity) {
+                currentItem.quantity = inlineExtractedTail.quantity;
+                if (inlineExtractedTail.stripped) {
+                    currentItem.dosage.push(inlineExtractedTail.stripped);
                 }
                 continue;
             }
@@ -3215,6 +2943,12 @@ function parseMedicineGuideItems(formattedText) {
                 if (extractedInlineDose.quantity) {
                     quantityPart = extractedInlineDose.quantity;
                     inlineDosagePart = extractedInlineDose.stripped;
+                } else {
+                    const inlineAnyQty = extractInlineQuantityAnyPosition(inlineDosagePart);
+                    if (inlineAnyQty.quantity) {
+                        quantityPart = inlineAnyQty.quantity;
+                        inlineDosagePart = inlineAnyQty.stripped;
+                    }
                 }
             }
 
@@ -3297,8 +3031,9 @@ function renderStructuredResult(formattedText) {
     if (!resultStructured) return;
     const sections = extractOcrSectionsForView(formattedText);
     const medicineItems = parseMedicineGuideItems(formattedText);
-    const medicineRelatedPattern = /^(Danh mục thuốc\s*:?|\d+\s*[\/\.)\-]|-\s*|Sáng|Trưa|Chiều|Tối|Uống|Thoa|Bôi|Liều|Ghi chú)/i;
-    const cleanedOther = (sections.other || []).filter((line) => !medicineRelatedPattern.test(line));
+    const medicineRelatedPattern = /^(Danh mục thuốc\s*:?|\d+\s*[\/\.)]|-\s*|Sáng|Trưa|Chiều|Tối|Uống|Thoa|Bôi|Liều|Ghi chú)/i;
+    const nameRelatedPattern = /(h[oọóòôơ]?\s*t[eêéè]n|ho\s*ten|hoten|tên\s*bệnh\s*nhân|ten\s*benh\s*nhan|đơn\s*thuốc\s*h[oọóòôơ]?\s*t[eêéè]n)/i;
+    const cleanedOther = (sections.other || []).filter((line) => !medicineRelatedPattern.test(line) && !nameRelatedPattern.test(line) && !isNameFieldLike(line));
 
     resultStructured.innerHTML = [
         renderSectionCard('Thông tin hành chính', sections.admin),
@@ -3853,3 +3588,4 @@ window.addEventListener('DOMContentLoaded', async () => {
 </script>
 </body>
 </html>
+

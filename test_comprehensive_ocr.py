@@ -109,12 +109,44 @@ for test in pipeline_tests:
 
 print(f"  → {passed_pipeline}/{len(pipeline_tests)} passed")
 
+# Test 4: preserve layout after glossary + formatter
+print("\n[TEST 4] Prescription layout stability")
+print("-" * 80)
+
+layout_input = (
+    "Điều trị: 1/ Amox ngọt 09 Viên Sáng 1; Trưa 1; Chiều 1\n"
+    "2/ PRED 5mg (uống sau ăn) 06 Viên Sáng 2"
+)
+
+glossary_out = apply_medical_glossary(layout_input)
+layout_out = format_prescription_output(glossary_out)
+
+layout_checks = [
+    ("Keep medicine 1 line", "1/ Amox" in layout_out),
+    ("Keep medicine 2 line", "2/ PRED" in layout_out),
+    ("Split medicine entries", "\n2/ PRED" in layout_out),
+    ("Split dosage line", "Viên\nSáng" in layout_out),
+]
+
+passed_layout = 0
+for desc, ok in layout_checks:
+    status = "✓" if ok else "✗"
+    if ok:
+        passed_layout += 1
+    print(f"  {status} {desc}")
+
+print("  Output preview:")
+for line in layout_out.split("\n")[:6]:
+    print(f"    {line}")
+print(f"  → {passed_layout}/{len(layout_checks)} passed")
+
 # Summary
 print("=" * 80)
 print("SUMMARY")
 print("=" * 80)
 total_passed = passed + passed_format + passed_pipeline
-total_tests = len(test_cases_scannable) + len(format_tests) + len(pipeline_tests)
+total_passed += passed_layout
+total_tests = len(test_cases_scannable) + len(format_tests) + len(pipeline_tests) + len(layout_checks)
 print(f"✓ Total: {total_passed}/{total_tests} tests passed")
 
 if total_passed == total_tests:

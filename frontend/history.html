@@ -489,10 +489,13 @@ function normalizeOcrLine(rawLine) {
 }
 
 function splitByMedicalFields(line) {
-    const withBreaks = line.replace(
-        /\s+(?=(Họ tên|NS|Ns|Địa chỉ|Điện thoại|Sinh hiệu|Thân nhiệt|Huyết áp|Cân nặng|Chẩn đoán|Chuẩn đoán|Điều trị|Bệnh kèm theo)\s*:)/gi,
-        '\n'
-    );
+    const withBreaks = line
+        .replace(
+            /\s+(?=(Họ tên|NS|Ns|Địa chỉ|Điện thoại|Sinh hiệu|Thân nhiệt|Huyết áp|Cân nặng|Chẩn đoán|Chuẩn đoán|Điều trị|Bệnh kèm theo)\s*:)/gi,
+            '\n'
+        )
+        .replace(/\s+(?=((?:\d{1,2}|[Ss])\s*(?:[\/\.)\-]|[Gg])\s*[A-Za-zÀ-ỹ]))/g, '\n')
+        .replace(/(?<=[A-Za-zÀ-ỹ0-9\)])(?=((?:\d{1,2}|[Ss])\s*(?:[\/\.)\-]|[Gg])\s*[A-Za-zÀ-ỹ]))/g, '\n');
     return withBreaks.split('\n').map((part) => part.trim()).filter(Boolean);
 }
 

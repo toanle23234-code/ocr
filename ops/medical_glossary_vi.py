@@ -81,11 +81,21 @@ MEDICAL_GLOSSARY_PATTERNS = [
 
 def apply_medical_glossary(text: str):
     result = str(text or "")
-    for pattern, replacement in MEDICAL_GLOSSARY_PATTERNS:
-        result = re.sub(pattern, replacement, result, flags=re.IGNORECASE)
+    normalized = result.replace("\r\n", "\n").replace("\r", "\n")
+    lines = normalized.split("\n")
+    output_lines = []
 
-    result = re.sub(r"\bis a\b", "là", result, flags=re.IGNORECASE)
-    result = re.sub(r"\bis an\b", "là", result, flags=re.IGNORECASE)
-    result = re.sub(r"\bare\b", "là", result, flags=re.IGNORECASE)
-    result = re.sub(r"\s+", " ", result).strip()
-    return result
+    for line in lines:
+        translated = line
+        for pattern, replacement in MEDICAL_GLOSSARY_PATTERNS:
+            translated = re.sub(pattern, replacement, translated, flags=re.IGNORECASE)
+
+        translated = re.sub(r"\bis a\b", "là", translated, flags=re.IGNORECASE)
+        translated = re.sub(r"\bis an\b", "là", translated, flags=re.IGNORECASE)
+        translated = re.sub(r"\bare\b", "là", translated, flags=re.IGNORECASE)
+        translated = re.sub(r"[ \t]+", " ", translated).strip()
+        output_lines.append(translated)
+
+    result = "\n".join(output_lines)
+    result = re.sub(r"\n{3,}", "\n\n", result)
+    return result.strip()

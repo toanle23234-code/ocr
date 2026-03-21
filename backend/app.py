@@ -1132,24 +1132,97 @@ def format_prescription_output(text):
     if not text:
         return text
     
-    formatted = str(text)
-    
-    # Add line breaks after common section headers
-    section_headers = [
-        r"(?i)^(đơn thuốc\s*:?)",
-        r"(?i)^(họ tên\s*:?)",
-        r"(?i)^(tuổi\s*:?)",
-        r"(?i)^(chẩn đoán\s*:?)",
-        r"(?i)^(điều trị\s*:?)",
-        r"(?i)^(huyết áp\s*:?)",
-        r"(?i)^(thân nhiệt\s*:?)",
-        r"(?i)^(địa chỉ\s*:?)",
-        r"(?i)^(điện thoại\s*:?)",
-        r"(?i)^(liều\s*:?)",
+    formatted = str(text).replace("\r\n", "\n").replace("\r", "\n")
+
+    # Normalize unaccented OCR output to proper Vietnamese headers.
+    header_normalizations = [
+        (r"\bHo\s*ten\b", "Họ tên"),
+        (r"\bHọ\s*ten\b", "Họ tên"),
+        (r"\bDia\s*chi\b", "Địa chỉ"),
+        (r"\bDien\s*thoai\b", "Điện thoại"),
+        (r"\bChan\s*doan\b", "Chẩn đoán"),
+        (r"\bDieu\s*tri\b", "Điều trị"),
+        (r"\bHuyet\s*ap\b", "Huyết áp"),
+        (r"\bThan\s*nhiet\b", "Thân nhiệt"),
+        (r"\bCan\s*nang\b", "Cân nặng"),
+        (r"\bDon\s*thuoc\b", "Đơn thuốc"),
+        (r"\bGioi\s*tinh\b", "Giới tính"),
+        (r"\bBenh\s*kem\s*theo\b", "Bệnh kèm theo"),
+        (r"\bLoi\s*dan\b", "Lời dặn"),
+        (r"\bBac\s*si\b", "Bác sĩ"),
+        (r"\bMach\b(?=\s*:)", "Mạch"),
+        (r"\bNhip\s*tho\b", "Nhịp thở"),
+        (r"\bTai\s*kham\b", "Tái khám"),
+        (r"\bNgay\s*kham\b", "Ngày khám"),
+        (r"\bTuoi\b", "Tuổi"),
+        (r"\bSinh\s*hieu\b", "Sinh hiệu"),
     ]
-    
+    for pattern, replacement in header_normalizations:
+        formatted = re.sub(pattern, replacement, formatted, flags=re.IGNORECASE)
+
+    # Keep key sections readable when OCR merges everything into one paragraph.
+    header_tokens = [
+        r"Đơn\s*thuốc\s*:",
+        r"Họ\s*tên\s*:",
+        r"NS\s*:",
+        r"Tuổi\s*:",
+        r"Giới\s*tính\s*:",
+        r"Địa\s*chỉ\s*:",
+        r"Điện\s*thoại\s*:",
+        r"Sinh\s*hiệu\s*:",
+        r"Thân\s*nhiệt\s*:",
+        r"Huyết\s*áp\s*:",
+        r"Mạch\s*:",
+        r"Nhịp\s*thở\s*:",
+        r"Cân\s*nặng\s*:",
+        r"Chẩn\s*đoán\s*:",
+        r"Bệnh\s*kèm\s*theo\s*:",
+        r"Điều\s*trị\s*:",
+        r"Liều\s*:",
+        r"Lời\s*dặn\s*:",
+        r"Tái\s*khám\s*:",
+        r"Bác\s*sĩ\s*:",
+        r"Ngày\s*khám\s*:",
+        r"Ngày\s*tái\s*khám\s*:",
+    ]
+    for token in header_tokens:
+        formatted = re.sub(rf"\s+(?={token})", "\n", formatted, flags=re.IGNORECASE)
+
+    # Split numbered medicines to separate lines: "1/ ...", "2/ ...", including glued OCR cases like "...Chiều 13/Peri...".
+    # Split numbered medicines: "1/ ...", "2/ ...".
+    # Use [/.)], NOT [-], to avoid splitting ICD codes like "J06 - Viêm".
+    formatted = re.sub(r"\s+(?=(?:\d{1,2}|[Ss])\s*[\/\.)]\s*[A-Za-zÀ-ỹ])", "\n", formatted)
+    # Zero-width split for OCR-glued text (e.g. "Chiều13/Peri").
+    # Only after digits/punctuation, never after letters (protects ICD codes).
+    # (?<!\n\d) prevents re-splitting numbers already at line start (e.g. "\n12/" → keep as-is).
+    formatted = re.sub(r"(?<!\n)(?<!\n\d)(?<=[0-9;,\)])(?=(?:\d{1,2}|[Ss])\s*[\/\.)]\s*[A-Za-zÀ-ỹ])", "\n", formatted)
+
+    # Place dosage instruction on next line after quantity if OCR merged them.
+    formatted = re.sub(
+        r"\b(Viên|Vien|Ống|Ong|Tuýp|Tuyp|Chai|Gói|Goi|Vỉ|Vi)\b\s+(?=(Sáng|Sang|Trưa|Trua|Chiều|Chieu|Tối|Toi|Thoa|Bôi|Boi|Uống|Uong|Ngày|Ngay))",
+        r"\1\n",
+        formatted,
+        flags=re.IGNORECASE,
+    )
+
+    # Split before un-numbered medicines embedded after dosage text.
+    # Pattern: after a digit (dosage context), a word >=3 chars that is NOT a
+    # dosage keyword, followed by a number + package unit.
+    # e.g. "Sáng 1; Chiều 1 Forte 06 Tuyp" -> split before "Forte".
+    _dose_kw = r"(?:Sáng|Sang|Trưa|Trua|Chiều|Chieu|Tối|Toi|Uống|Uong|Thoa|Bôi|Boi|Liều|Ngày|Ngay)"
+    _pkg_unit = r"(?:Viên|Vien|Ống|Ong|Tuýp|Tuyp|Chai|Gói|Goi|Vỉ|Vi|Giọt|Giot)"
+    formatted = re.sub(
+        rf"(?<=\d)\s+(?=(?!{_dose_kw}\b)[A-Za-z\u00c0-\u1ef9]{{3,}}(?:\s+[A-Za-z\u00c0-\u1ef9]{{1,}}){{0,3}}\s+\d{{1,3}}\s*{_pkg_unit}\b)",
+        "\n",
+        formatted,
+        flags=re.IGNORECASE,
+    )
+
     # Normalize multiple spaces to single space
     formatted = re.sub(r"[ \t]+", " ", formatted)
+    formatted = re.sub(r"\n{2,}", "\n", formatted)
+    formatted = re.sub(r" +\n", "\n", formatted)
+    formatted = re.sub(r"\n +", "\n", formatted)
     
     # Fix common spacing issues
     formatted = re.sub(r"(\d+)\s+([mM][gG]|[mM][lL]|[uU][iI])\b", r"\1 \2", formatted)
@@ -1481,7 +1554,54 @@ def _render_section_lines(lines):
 def _normalize_medicine_name(raw_line: str) -> str:
     line = (raw_line or "").strip()
     line = re.sub(r"^\d+\s*[\/\.\-)]+\s*", "", line).strip()
+
+    # Remove trailing quantity/schedule fragments so medicine label stays clean.
+    line = re.sub(
+        r"\b\d+\s*(Viên|vien|Ống|ong|Tuýp|tuyp|Chai|chai|Vỉ|vi|Gói|goi|ml)\b.*$",
+        "",
+        line,
+        flags=re.IGNORECASE,
+    ).strip(" ,;.-")
     return line or "Không rõ tên thuốc"
+
+
+def _extract_quantity_and_daily_dose(source: str):
+    text = re.sub(r"\s+", " ", (source or "").strip())
+    if not text:
+        return "", ""
+
+    quantity = ""
+    daily_dose = ""
+
+    quantity_match = re.search(
+        r"\b(\d+(?:[\.,]\d+)?)\s*(Viên|vien|Ống|ong|Tuýp|tuyp|Chai|chai|Vỉ|vi|Gói|goi|ml)\b",
+        text,
+        flags=re.IGNORECASE,
+    )
+    if quantity_match:
+        quantity_value = quantity_match.group(1).replace(",", ".")
+        quantity_unit = quantity_match.group(2)
+        unit_map = {
+            "vien": "viên",
+            "ong": "ống",
+            "tuyp": "tuýp",
+            "vi": "vỉ",
+            "goi": "gói",
+        }
+        quantity_unit_norm = unit_map.get(quantity_unit.lower(), quantity_unit)
+        quantity = f"{quantity_value} {quantity_unit_norm}"
+
+    dose_match = re.search(r"\bx\s*(\d+(?:[\.,]\d+)?)\s*l[âa]n\s*/\s*ng[àa]y\b", text, flags=re.IGNORECASE)
+    if not dose_match:
+        dose_match = re.search(r"\b(\d+(?:[\.,]\d+)?)\s*l[âa]n\s*/\s*ng[àa]y\b", text, flags=re.IGNORECASE)
+    if not dose_match:
+        dose_match = re.search(r"\bng[àa]y\s*(\d+(?:[\.,]\d+)?)\s*l[âa]n\b", text, flags=re.IGNORECASE)
+
+    if dose_match:
+        dose_value = dose_match.group(1).replace(",", ".")
+        daily_dose = f"{dose_value} lần/ngày"
+
+    return quantity, daily_dose
 
 
 def _parse_instruction_schedule(line: str):
@@ -1494,7 +1614,8 @@ def _parse_instruction_schedule(line: str):
     consumed_spans = []
 
     pattern = re.compile(
-        r"(Sáng|Sang|Trưa|Trua|Tra|Chiều|Chieu|Tối|Toi)\s*[:\-]?\s*([^;\n]+)",
+        r"(Sáng|Sang|Trưa|Trua|Tra|Chiều|Chieu|Tối|Toi)\s*[:\-]?\s*(.*?)"
+        r"(?=\s*(?:;|,|$|Sáng|Sang|Trưa|Trua|Tra|Chiều|Chieu|Tối|Toi))",
         flags=re.IGNORECASE,
     )
 
@@ -1513,6 +1634,9 @@ def _parse_instruction_schedule(line: str):
     for match in pattern.finditer(source):
         label = (match.group(1) or "").strip().lower()
         value = (match.group(2) or "").strip(" ;,.")
+        value = re.sub(r"\bx\s*\d+(?:[\.,]\d+)?\s*l[âa]n\s*/\s*ng[àa]y\b", "", value, flags=re.IGNORECASE).strip(" ;,.")
+        value = re.sub(r"\b\d+(?:[\.,]\d+)?\s*l[âa]n\s*/\s*ng[àa]y\b", "", value, flags=re.IGNORECASE).strip(" ;,.")
+        value = re.sub(r"\bng[àa]y\s*\d+(?:[\.,]\d+)?\s*l[âa]n\b", "", value, flags=re.IGNORECASE).strip(" ;,.")
         key = label_key_map.get(label)
         if not key:
             continue
@@ -1557,9 +1681,29 @@ def _render_instruction_plan(medicines, instruction_lines, extra_lines):
     rows_html = ""
 
     for index in range(total_rows):
-        medicine_name = _normalize_medicine_name(medicine_lines[index]) if index < len(medicine_lines) else f"Thuốc {index + 1}"
+        medicine_line = medicine_lines[index] if index < len(medicine_lines) else ""
+        medicine_name = _normalize_medicine_name(medicine_line) if medicine_line else f"Thuốc {index + 1}"
         instruction = instruction_lines[index] if index < len(instruction_lines) else ""
+        instruction_source = instruction or medicine_line
         parsed = _parse_instruction_schedule(instruction)
+        if instruction_source and not any((parsed.get(k) or "").strip() for k in ("morning", "noon", "afternoon", "evening")):
+            parsed = _parse_instruction_schedule(instruction_source)
+
+        quantity, daily_dose = _extract_quantity_and_daily_dose(instruction_source or medicine_line)
+
+        meta_badges = ""
+        quantity_value = quantity or "-"
+        daily_dose_value = daily_dose or "-"
+        meta_badges += (
+            f'<span style="display:inline-block;padding:4px 8px;border-radius:999px;border:1px solid rgba(34,197,94,0.25);'
+            f'background:rgba(21,128,61,0.16);color:#bbf7d0;font-size:12px;margin:0 6px 6px 0;">'
+            f'Số lượng: <strong style="color:#dcfce7;">{html.escape(quantity_value)}</strong></span>'
+        )
+        meta_badges += (
+            f'<span style="display:inline-block;padding:4px 8px;border-radius:999px;border:1px solid rgba(250,204,21,0.28);'
+            f'background:rgba(161,98,7,0.16);color:#fde68a;font-size:12px;margin:0 6px 6px 0;">'
+            f'Liều/ngày: <strong style="color:#fef9c3;">{html.escape(daily_dose_value)}</strong></span>'
+        )
 
         schedule_badges = ""
         for key, label in time_labels:
@@ -1585,6 +1729,7 @@ def _render_instruction_plan(medicines, instruction_lines, extra_lines):
             'border:1px solid rgba(148,163,184,0.15);margin-bottom:8px;">'
             f'<div style="color:#67e8f9;font-size:12px;font-weight:700;margin-bottom:6px;">Thuốc {index + 1}: '
             f'<span style="color:#e2e8f0;font-weight:600;">{html.escape(medicine_name)}</span></div>'
+            f'<div>{meta_badges}</div>'
             f'<div>{schedule_badges}</div>'
             f'{note_html}'
             '</div>'

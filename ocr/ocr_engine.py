@@ -329,6 +329,16 @@ def _format_prescription_layout(text):
         (r"\bThan\s*nhiet\b", "Thân nhiệt"),
         (r"\bCan\s*nang\b", "Cân nặng"),
         (r"\bDon\s*thuoc\b", "Đơn thuốc"),
+        (r"\bGioi\s*tinh\b", "Giới tính"),
+        (r"\bBenh\s*kem\s*theo\b", "Bệnh kèm theo"),
+        (r"\bLoi\s*dan\b", "Lời dặn"),
+        (r"\bBac\s*si\b", "Bác sĩ"),
+        (r"\bMach\b(?=\s*:)", "Mạch"),
+        (r"\bNhip\s*tho\b", "Nhịp thở"),
+        (r"\bTai\s*kham\b", "Tái khám"),
+        (r"\bNgay\s*kham\b", "Ngày khám"),
+        (r"\bTuoi\b", "Tuổi"),
+        (r"\bSinh\s*hieu\b", "Sinh hiệu"),
     ]
     for pattern, replacement in header_normalizations:
         formatted = re.sub(pattern, replacement, formatted, flags=re.IGNORECASE)
@@ -337,25 +347,57 @@ def _format_prescription_layout(text):
     header_tokens = [
         r"Họ\s*tên\s*:",
         r"NS\s*:",
+        r"Tuổi\s*:",
+        r"Giới\s*tính\s*:",
         r"Địa\s*chỉ\s*:",
         r"Điện\s*thoại\s*:",
         r"Sinh\s*hiệu\s*:",
         r"Thân\s*nhiệt\s*:",
         r"Huyết\s*áp\s*:",
+        r"Mạch\s*:",
+        r"Nhịp\s*thở\s*:",
         r"Cân\s*nặng\s*:",
         r"Chẩn\s*đoán\s*:",
+        r"Bệnh\s*kèm\s*theo\s*:",
         r"Điều\s*trị\s*:",
+        r"Lời\s*dặn\s*:",
+        r"Tái\s*khám\s*:",
+        r"Bác\s*sĩ\s*:",
+        r"Ngày\s*khám\s*:",
     ]
     for token in header_tokens:
         formatted = re.sub(rf"\s+(?={token})", "\n", formatted, flags=re.IGNORECASE)
 
-    # Split medicine rows like "1/ ..." onto new lines.
-    formatted = re.sub(r"\s+(?=\d+\s*/)", "\n", formatted)
+    # Split medicine rows like "1/ ..." onto new lines (handled by the wider regex below).
+
+    # Split embedded index patterns merged by OCR, e.g. "... Chiều 1 2/ PRED ...".
+    # Use [/.)], NOT [-] or [Gg], to avoid splitting ICD codes (J06 - ...) or dosage (5g).
+    formatted = re.sub(
+        r"\s+(?=(?:\d{1,2}|[Ss])\s*[\/\.\)]\s*[A-Za-zÀ-ỹ])",
+        "\n",
+        formatted,
+    )
+    formatted = re.sub(
+        r"(?<=[0-9;,\)])\s+(?=((?:\d{1,2}|[Ss])\s+[A-Za-zÀ-ỹ][A-Za-zÀ-ỹ0-9()\-]{2,}(?:\s+[A-Za-zÀ-ỹ0-9()\-]{1,}){0,5}\s+\d{1,3}\s*(?:Viên|Vien|Ống|Ong|Chai|Tuýp|Tuyp|Gói|Goi|Vỉ|Vi)))",
+        "\n",
+        formatted,
+        flags=re.IGNORECASE,
+    )
 
     # Split quantity and dosage if OCR merged them in one line.
     formatted = re.sub(
-        r"\b(Viên|Ống|Tuýp|Chai|Vỉ)\b\s+(?=(Sáng|Trưa|Chiều|Tối|Thoa|Uống|Ngày))",
+        r"\b(Viên|Vien|Ống|Ong|Tuýp|Tuyp|Chai|Gói|Goi|Vỉ|Vi)\b\s+(?=(Sáng|Sang|Trưa|Trua|Chiều|Chieu|Tối|Toi|Thoa|Bôi|Boi|Uống|Uong|Ngày|Ngay))",
         r"\1\n",
+        formatted,
+        flags=re.IGNORECASE,
+    )
+
+    # Split before un-numbered medicines embedded after dosage text.
+    _dose_kw = r"(?:Sáng|Sang|Trưa|Trua|Chiều|Chieu|Tối|Toi|Uống|Uong|Thoa|Bôi|Boi|Liều|Ngày|Ngay)"
+    _pkg_unit = r"(?:Viên|Vien|Ống|Ong|Tuýp|Tuyp|Chai|Gói|Goi|Vỉ|Vi|Giọt|Giot)"
+    formatted = re.sub(
+        rf"(?<=\d)\s+(?=(?!{_dose_kw}\b)[A-Za-z\u00c0-\u1ef9]{{3,}}(?:\s+[A-Za-z\u00c0-\u1ef9]{{1,}}){{0,3}}\s+\d{{1,3}}\s*{_pkg_unit}\b)",
+        "\n",
         formatted,
         flags=re.IGNORECASE,
     )
@@ -366,6 +408,56 @@ def _format_prescription_layout(text):
     formatted = re.sub(r" +\n", "\n", formatted)
     formatted = re.sub(r"\n +", "\n", formatted)
     return formatted.strip()
+
+
+def _text_from_ocr_data(ocr_data):
+    """Rebuild OCR text by line from TSV data to preserve medicine boundaries."""
+    if not ocr_data:
+        return ""
+
+    texts = ocr_data.get("text") or []
+    if not texts:
+        return ""
+
+    block_nums = ocr_data.get("block_num") or []
+    par_nums = ocr_data.get("par_num") or []
+    line_nums = ocr_data.get("line_num") or []
+    confs = ocr_data.get("conf") or []
+
+    grouped = {}
+    order = []
+    for i, token in enumerate(texts):
+        word = str(token or "").strip()
+        if not word:
+            continue
+
+        conf_value = -1.0
+        try:
+            conf_value = float(confs[i])
+        except Exception:
+            conf_value = -1.0
+        if conf_value < 0:
+            continue
+
+        b = block_nums[i] if i < len(block_nums) else 0
+        p = par_nums[i] if i < len(par_nums) else 0
+        l = line_nums[i] if i < len(line_nums) else 0
+        key = (b, p, l)
+        if key not in grouped:
+            grouped[key] = []
+            order.append(key)
+        grouped[key].append(word)
+
+    lines = []
+    for key in sorted(order):
+        words = grouped.get(key, [])
+        if not words:
+            continue
+        line = " ".join(words).strip()
+        if line:
+            lines.append(line)
+
+    return "\n".join(lines)
 
 
 def _extract_with_confidence(image, lang, config):
@@ -388,9 +480,17 @@ def _extract_with_confidence(image, lang, config):
             conf_values.append(conf)
 
     avg_conf = (sum(conf_values) / len(conf_values)) if conf_values else 0.0
-    text = _post_process_text(raw_text)
-    score = _score_ocr_text(text, avg_conf)
-    return text, score
+
+    tsv_text = _text_from_ocr_data(ocr_data)
+    raw_clean = _post_process_text(raw_text)
+    tsv_clean = _post_process_text(tsv_text)
+
+    # Prefer line-preserving text when it yields better OCR quality score.
+    raw_score = _score_ocr_text(raw_clean, avg_conf)
+    tsv_score = _score_ocr_text(tsv_clean, avg_conf)
+    if tsv_score >= raw_score:
+        return tsv_clean, tsv_score
+    return raw_clean, raw_score
 
 
 def _score_ocr_text(text, avg_conf):
@@ -435,6 +535,46 @@ def _score_ocr_text(text, avg_conf):
     return float(score)
 
 
+def _prescription_keyword_hits(text):
+    if not text:
+        return 0
+
+    medical_keywords = [
+        "đơn thuốc", "ho ten", "họ tên", "tuoi", "tuổi", "chẩn đoán", "chuẩn đoán",
+        "điều trị", "liều", "ngày", "uống", "sáng", "chiều", "tối", "huyết áp",
+        "thân nhiệt", "địa chỉ", "điện thoại", "viên", "ống", "ml", "mg", "ui",
+        "lần/ngày", "lần/ngay", "dưới dạng", "duoi dang", "trưa", "trua",
+        "bác sĩ", "bác si", "kê đơn", "ke don", "thuốc", "thuoc", "bệnh", "benh",
+        "bệnh nhân", "benh nhan", "toa thuoc", "tòa thuốc", "toá thuốc", "đơn", "don",
+        "số", "so", "lượng", "luong", "liều lượng", "don thuoc",
+    ]
+
+    normalized = unicodedata.normalize("NFD", text.lower())
+    normalized = re.sub(r"[\u0300-\u036f]", "", normalized)
+    return sum(1 for kw in medical_keywords if kw in normalized)
+
+
+def _is_strong_ocr_candidate(text, score):
+    if not text:
+        return False
+
+    stripped = text.strip()
+    if len(stripped) < 20:
+        return False
+
+    line_count = len([ln for ln in stripped.splitlines() if len(ln.strip()) >= 3])
+    keyword_hits = _prescription_keyword_hits(stripped)
+    alnum_count = len(re.findall(r"[A-Za-z0-9À-ỹ]", stripped))
+    alnum_ratio = alnum_count / max(len(stripped), 1)
+
+    return (
+        score >= 28
+        and keyword_hits >= 2
+        and line_count >= 2
+        and alnum_ratio >= 0.45
+    )
+
+
 def _build_language_list():
     try:
         available = set(pytesseract.get_languages(config=""))
@@ -475,17 +615,18 @@ def extract_text(image_path):
         best_text = None
         best_score = 0
 
-        # Phase 1: Try all preprocessing variants with PSM 11
+        # Phase 1: Try all preprocessing variants with all common PSM modes.
         variants = preprocess_variants(img)
         logger.info("OCR: trying %d preprocessing variants", len(variants))
         
         for variant_name, processed in variants:
-            for psm_mode, config in psm_configs[:1]:  # Try PSM 11 with each variant first
+            for psm_mode, config in psm_configs:
                 try:
                     text, score = _extract_with_confidence(processed, lang=lang, config=config)
                     logger.info("OCR variant=%s psm=%d: score=%.1f, len=%d", variant_name, psm_mode, score, len(text or ''))
                     
-                    if text and score >= 5:  # Lower threshold to accept more text
+                    if _is_strong_ocr_candidate(text, score):
+                        logger.info("OCR: accepted strong candidate variant=%s psm=%d score=%.1f", variant_name, psm_mode, score)
                         return _format_prescription_layout(text)
                     
                     if text and score > best_score:
@@ -508,7 +649,8 @@ def extract_text(image_path):
                                 text, score = _extract_with_confidence(processed, lang=lang, config=config)
                                 logger.info("OCR crop variant=%s psm=%d: score=%.1f, len=%d", variant_name, psm_mode, score, len(text or ''))
                                 
-                                if text and score >= 5:
+                                if _is_strong_ocr_candidate(text, score):
+                                    logger.info("OCR: accepted strong cropped candidate variant=%s psm=%d score=%.1f", variant_name, psm_mode, score)
                                     return _format_prescription_layout(text)
                                 
                                 if text and score > best_score:
@@ -528,9 +670,15 @@ def extract_text(image_path):
                 try:
                     raw = pytesseract.image_to_string(gray_fb, lang=lang, config=config, timeout=45)
                     raw = _post_process_text(raw)
-                    if raw and len(raw.strip()) >= 5:
-                        logger.info("OCR gray psm=%d: len=%d", psm_mode, len(raw))
-                        return _format_prescription_layout(raw)
+                    if raw:
+                        gray_score = _score_ocr_text(raw, 0.0)
+                        logger.info("OCR gray psm=%d: score=%.1f len=%d", psm_mode, gray_score, len(raw))
+                        if _is_strong_ocr_candidate(raw, gray_score):
+                            return _format_prescription_layout(raw)
+
+                        if gray_score > best_score:
+                            best_score = gray_score
+                            best_text = raw
                 except Exception as e:
                     logger.warning("OCR gray psm=%d error: %s", psm_mode, e)
         except Exception as e:
@@ -538,7 +686,7 @@ def extract_text(image_path):
 
         # Return best result found, even if score is low
         if best_text:
-            logger.info("OCR: returning best result with score=%.1f", best_score)
+            logger.info("OCR: returning best candidate with score=%.1f", best_score)
             return _format_prescription_layout(best_text)
 
         return "Không thể trích xuất văn bản rõ ràng từ ảnh. Hãy thử ảnh rõ hơn hoặc chụp thẳng góc."
