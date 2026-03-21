@@ -29,4 +29,4 @@ RUN tesseract --version
 # Render sẽ tự set biến PORT, mặc định 10000
 EXPOSE 10000
 
-CMD sh -c "gunicorn --chdir backend app:app --bind 0.0.0.0:${PORT:-10000} --workers 2 --timeout 300 --graceful-timeout 30"
+CMD sh -c "gunicorn --chdir backend app:app --bind 0.0.0.0:${PORT:-10000} --workers 1 --timeout 300 --graceful-timeout 30"
